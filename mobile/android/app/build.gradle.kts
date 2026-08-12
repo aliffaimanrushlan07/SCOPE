@@ -1,8 +1,23 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// The Google Maps Android key is read from android/local.properties, which is
+// gitignored, and injected into the manifest as a placeholder at build time.
+//
+// It is NOT written into AndroidManifest.xml directly, because that file is
+// committed — a key pasted there would be published to GitHub the moment the
+// repository is pushed. The key still ships inside the APK and can be
+// extracted from it; that is unavoidable for the Maps SDK, and is why the key
+// is restricted by package name and signing certificate in the Cloud console.
+val mapsApiKey: String = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}.getProperty("MAPS_API_KEY") ?: ""
 
 android {
     namespace = "my.edu.scope"
@@ -30,6 +45,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {

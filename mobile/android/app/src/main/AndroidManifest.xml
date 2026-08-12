@@ -43,6 +43,14 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Google Maps Android key (S06 hotspot map, S11 location tagging).
+             The value is a build-time placeholder supplied from
+             android/local.properties, which is gitignored — see
+             android/app/build.gradle.kts. Never paste the key here. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
