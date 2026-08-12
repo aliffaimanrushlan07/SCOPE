@@ -42,7 +42,7 @@ WHERE conname IN (
     'admin_user_role_valid',
     'admin_activity_log_type_valid'
 )
-ORDER BY entity::text, conname;
+ORDER BY conrelid::regclass::text, conname;
 
 \echo ''
 \echo '=== Spatial index on report.geom (supports S06 and D03) ==='
