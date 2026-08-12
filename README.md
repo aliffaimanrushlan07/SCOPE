@@ -75,7 +75,32 @@ Development credentials — never deploy these:
 cd backend && cp .env.example .env
 ```
 
-Fill in `.env`, then follow Phase 2 of the build guide.
+Generate a JWT secret into `.env`, then run:
+
+```bash
+cd backend && ./.venv/bin/python -m uvicorn app.main:app --reload
+```
+
+Interactive API documentation: <http://127.0.0.1:8000/docs>
+
+**Postman.** Import `docs/scope-openapi.json` — Postman builds the full
+collection from the OpenAPI schema, so it never drifts from the code. Re-export
+after changing any route:
+
+```bash
+cd backend && ./.venv/bin/python -c "import json; from app.main import app; json.dump(app.openapi(), open('../docs/scope-openapi.json','w'), indent=2)"
+```
+
+### 3. End-to-end check
+
+With the database and API running:
+
+```bash
+./backend/.venv/bin/python docs/e2e_check.py
+```
+
+52 assertions covering the full reporting path (S10 → S13 → S14) and the
+administrative path (D01 → D05), including the design rules below.
 
 ---
 
