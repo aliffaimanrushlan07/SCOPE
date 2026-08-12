@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgis/postgis:15-3.4
+    container_name: scope-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: scope
+      POSTGRES_USER: scope
+      POSTGRES_PASSWORD: scope_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Files in this directory run once, in filename order, on FIRST boot
+      # only — that is, when the pgdata volume is empty. To re-apply them
+      # after editing, run: docker compose down -v && docker compose up -d
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scope -d scope"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

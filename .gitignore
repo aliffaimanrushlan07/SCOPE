@@ -1,0 +1,43 @@
+# --- Python / FastAPI ---
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# --- Secrets ---
+.env
+*.env
+!.env.example
+
+# --- Node / React ---
+node_modules/
+dist/
+.vite/
+
+# --- Flutter / Dart ---
+.dart_tool/
+.packages
+build/
+*.iml
+android/local.properties
+android/.gradle/
+android/key.properties
+ios/Pods/
+
+# --- ML: never commit the image corpus or model weights ---
+ml/data/
+ml/artifacts/
+*.h5
+*.keras
+*.tflite
+*.pb
+
+# --- Backend uploads ---
+backend/uploads/
+
+# --- macOS / editors ---
+.DS_Store
+.idea/
+.vscode/
+!.vscode/extensions.json
