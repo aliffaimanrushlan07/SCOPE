@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    DEVELOPMENT ONLY.
+
+    Android 9+ blocks cleartext HTTP by default. The SCOPE backend runs over
+    plain HTTP on a development machine, so the emulator and a phone on the
+    same network need an exception to reach it.
+
+    The exception is scoped to local addresses only — it is NOT a blanket
+    android:usesCleartextTraffic="true", which would permit cleartext to any
+    host on the internet and would be indefensible for an application that
+    transmits photographs of identifiable individuals.
+
+    REMOVE THIS FILE (and the networkSecurityConfig attribute in
+    AndroidManifest.xml) before any real deployment. Production traffic must
+    be HTTPS/TLS, as claimed in the project's non-functional requirements.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- The Android emulator's alias for the host machine -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- A physical handset reaching the development Mac over Wi-Fi.
+             Replace with your machine's address from: ipconfig getifaddr en0 -->
+        <domain includeSubdomains="false">192.168.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

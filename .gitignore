@@ -41,3 +41,7 @@ backend/uploads/
 .idea/
 .vscode/
 !.vscode/extensions.json
+
+# Flutter build output
+mobile/build/
+mobile/.flutter-plugins*
