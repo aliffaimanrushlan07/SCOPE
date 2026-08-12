@@ -102,6 +102,22 @@ class ScopeApi {
         .toList(growable: false);
   }
 
+  /// Read-only detail of one report.
+  ///
+  /// [deviceId] is required by the backend and must match the filing device:
+  /// without it a guessed reference number would expose someone else's
+  /// photographic evidence.
+  Future<ReportDetail> reportDetail({
+    required String referenceNo,
+    required String deviceId,
+  }) async {
+    final response = await _client.get<Map<String, dynamic>>(
+      '/reports/$referenceNo',
+      query: {'device_id': deviceId},
+    );
+    return ReportDetail.fromJson(response.data!);
+  }
+
   // -------------------------------------------------------------------------
   // S02 / S04 / S06 — public content
   // -------------------------------------------------------------------------

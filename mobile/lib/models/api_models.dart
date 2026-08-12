@@ -160,6 +160,68 @@ class ReportHistoryItem {
       );
 }
 
+/// One stored photograph on a report detail view.
+class ReportPhotoDetail {
+  const ReportPhotoDetail({
+    required this.sequenceNo,
+    required this.storagePath,
+    required this.confidenceScore,
+    required this.capturedAt,
+  });
+
+  final int sequenceNo;
+  final String storagePath;
+  final double confidenceScore;
+  final DateTime capturedAt;
+
+  factory ReportPhotoDetail.fromJson(Map<String, dynamic> json) =>
+      ReportPhotoDetail(
+        sequenceNo: json['sequence_no'] as int,
+        storagePath: json['storage_path'] as String,
+        confidenceScore: (json['confidence_score'] as num).toDouble(),
+        capturedAt: DateTime.parse(json['captured_at'] as String),
+      );
+}
+
+/// Read-only detail of a filed report (S14).
+class ReportDetail {
+  const ReportDetail({
+    required this.referenceNo,
+    required this.reportedAt,
+    required this.submittedAt,
+    required this.latitude,
+    required this.longitude,
+    required this.photos,
+    this.premiseName,
+    this.addressText,
+  });
+
+  final String referenceNo;
+  final DateTime reportedAt;
+  final DateTime submittedAt;
+  final double latitude;
+  final double longitude;
+  final List<ReportPhotoDetail> photos;
+  final String? premiseName;
+  final String? addressText;
+
+  String get locationLabel =>
+      premiseName ?? addressText ?? 'Location not recorded';
+
+  factory ReportDetail.fromJson(Map<String, dynamic> json) => ReportDetail(
+        referenceNo: json['reference_no'] as String,
+        reportedAt: DateTime.parse(json['reported_at'] as String),
+        submittedAt: DateTime.parse(json['submitted_at'] as String),
+        latitude: (json['latitude'] as num).toDouble(),
+        longitude: (json['longitude'] as num).toDouble(),
+        premiseName: json['premise_name'] as String?,
+        addressText: json['address_text'] as String?,
+        photos: (json['photos'] as List)
+            .map((e) => ReportPhotoDetail.fromJson(e as Map<String, dynamic>))
+            .toList(growable: false),
+      );
+}
+
 /// A weighted point of the public density heatmap (S06).
 class HotspotPoint {
   const HotspotPoint({
