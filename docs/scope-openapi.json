@@ -329,6 +329,49 @@
         }
       }
     },
+    "/api/v1/geo/place/{place_id}": {
+      "get": {
+        "tags": [
+          "Mapping"
+        ],
+        "summary": "Resolve a search result to coordinates (S11)",
+        "description": "Turn an autocomplete suggestion into a taggable point.\n\nAutocomplete returns place identifiers, not coordinates, so selecting a\nsearch result needs this second call before the map pin can move.",
+        "operationId": "place_detail_api_v1_geo_place__place_id__get",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Place Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/geo/reverse": {
       "get": {
         "tags": [
@@ -1618,6 +1661,47 @@
           "passed"
         ],
         "title": "PhotoVerdict"
+      },
+      "PlaceDetail": {
+        "properties": {
+          "place_id": {
+            "type": "string",
+            "title": "Place Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          }
+        },
+        "type": "object",
+        "required": [
+          "place_id",
+          "name",
+          "address",
+          "latitude",
+          "longitude"
+        ],
+        "title": "PlaceDetail",
+        "description": "A search result resolved to a taggable point (S11)."
       },
       "PlaceSuggestion": {
         "properties": {

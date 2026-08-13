@@ -141,6 +141,27 @@ class ScopeApi {
   // S11 — mapping, proxied so the server key never ships in the app
   // -------------------------------------------------------------------------
 
+  /// Premise autocomplete. Proxied so the Places key stays on the server.
+  Future<List<Map<String, String?>>> searchPlaces(String query) async {
+    final response =
+        await _client.get<List<dynamic>>('/geo/search', query: {'q': query});
+    return (response.data ?? [])
+        .map((e) => {
+              'place_id': e['place_id'] as String?,
+              'description': e['description'] as String?,
+              'main_text': e['main_text'] as String?,
+              'secondary_text': e['secondary_text'] as String?,
+            })
+        .toList(growable: false);
+  }
+
+  /// Resolve a search suggestion to coordinates.
+  Future<PlaceDetail> placeDetail(String placeId) async {
+    final response =
+        await _client.get<Map<String, dynamic>>('/geo/place/$placeId');
+    return PlaceDetail.fromJson(response.data!);
+  }
+
   Future<Map<String, String?>> reverseGeocode(double lat, double lng) async {
     final response = await _client.get<Map<String, dynamic>>(
       '/geo/reverse',

@@ -16,13 +16,14 @@ from fastapi import APIRouter, HTTPException, Query, status
 import httpx
 
 from app.config import get_settings
-from app.schemas import PlaceSuggestion, ReverseGeocodeResult
+from app.schemas import PlaceDetail, PlaceSuggestion, ReverseGeocodeResult
 
 router = APIRouter(prefix="/api/v1/geo", tags=["Mapping"])
 settings = get_settings()
 
 _AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete"
 _GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+_PLACE_DETAIL_URL = "https://places.googleapis.com/v1/places"
 
 # Bias results toward the system's jurisdiction (Kuala Lumpur and Putrajaya).
 _KL_CENTRE = {"latitude": 3.1390, "longitude": 101.6869}
@@ -72,6 +73,64 @@ async def search_places(q: str = Query(min_length=2, max_length=200)) -> list[Pl
             )
         )
     return suggestions
+
+
+@router.get(
+    "/place/{place_id}",
+    response_model=PlaceDetail,
+    summary="Resolve a search result to coordinates (S11)",
+)
+async def place_detail(place_id: str) -> PlaceDetail:
+    """Turn an autocomplete suggestion into a taggable point.
+
+    Autocomplete returns place identifiers, not coordinates, so selecting a
+    search result needs this second call before the map pin can move.
+    """
+    _require_key()
+
+    if not place_id or "/" in place_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid place id."
+        )
+
+    headers = {
+        "X-Goog-Api-Key": settings.server_maps_key,
+        "X-Goog-FieldMask": "displayName,formattedAddress,location",
+    }
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        try:
+            response = await client.get(
+                f"{_PLACE_DETAIL_URL}/{place_id}", headers=headers
+            )
+        except httpx.RequestError as exc:
+            raise _upstream_unavailable() from exc
+
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Place not found."
+        )
+    if response.status_code != 200:
+        raise _upstream_unavailable()
+
+    body = response.json()
+    location = body.get("location", {})
+    latitude = location.get("latitude")
+    longitude = location.get("longitude")
+
+    if latitude is None or longitude is None:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="That place has no coordinates.",
+        )
+
+    return PlaceDetail(
+        place_id=place_id,
+        name=body.get("displayName", {}).get("text", ""),
+        address=body.get("formattedAddress"),
+        latitude=latitude,
+        longitude=longitude,
+    )
 
 
 @router.get(

@@ -160,6 +160,31 @@ class ReportHistoryItem {
       );
 }
 
+/// A search result resolved to a taggable point (S11).
+class PlaceDetail {
+  const PlaceDetail({
+    required this.placeId,
+    required this.name,
+    required this.latitude,
+    required this.longitude,
+    this.address,
+  });
+
+  final String placeId;
+  final String name;
+  final double latitude;
+  final double longitude;
+  final String? address;
+
+  factory PlaceDetail.fromJson(Map<String, dynamic> json) => PlaceDetail(
+        placeId: json['place_id'] as String,
+        name: json['name'] as String,
+        latitude: (json['latitude'] as num).toDouble(),
+        longitude: (json['longitude'] as num).toDouble(),
+        address: json['address'] as String?,
+      );
+}
+
 /// One stored photograph on a report detail view.
 class ReportPhotoDetail {
   const ReportPhotoDetail({

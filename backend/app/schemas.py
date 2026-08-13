@@ -157,6 +157,16 @@ class PlaceSuggestion(BaseModel):
     secondary_text: str | None = None
 
 
+class PlaceDetail(BaseModel):
+    """A search result resolved to a taggable point (S11)."""
+
+    place_id: str
+    name: str
+    address: str | None
+    latitude: float
+    longitude: float
+
+
 class ReverseGeocodeResult(BaseModel):
     address_text: str | None
     premise_name: str | None
