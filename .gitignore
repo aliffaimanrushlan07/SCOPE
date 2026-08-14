@@ -45,3 +45,6 @@ backend/uploads/
 # Flutter build output
 mobile/build/
 mobile/.flutter-plugins*
+
+# Dashboard build output
+dashboard/dist/

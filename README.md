@@ -91,7 +91,20 @@ after changing any route:
 cd backend && ./.venv/bin/python -c "import json; from app.main import app; json.dump(app.openapi(), open('../docs/scope-openapi.json','w'), indent=2)"
 ```
 
-### 3. End-to-end check
+### 3. Admin dashboard
+
+```bash
+cd dashboard && cp .env.example .env && npm install
+```
+
+```bash
+cd dashboard && npm run dev
+```
+
+Opens on <http://localhost:5173>. The backend must be running, and its
+`DASHBOARD_ORIGIN` must match that URL or CORS will block every request.
+
+### 4. End-to-end check
 
 With the database and API running:
 
