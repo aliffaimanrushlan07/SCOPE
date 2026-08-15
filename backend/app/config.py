@@ -30,8 +30,13 @@ class Settings(BaseSettings):
     # the mobile application.
     ai_confidence_threshold: float = 0.85
     ai_model_version: str = "vit-scope-v1"
-    ai_model_path: str = "../ml/artifacts/vit-scope-v1"
+    ai_model_path: str = "../ml/artifacts/vit-scope-v1.keras"
     ai_request_timeout_seconds: int = 30
+
+    # Forces the deterministic stub even when a model file is present. Useful
+    # for running the app without loading a gigabyte of weights; scores are
+    # then meaningless and must never be presented as real results.
+    ai_stub_mode: bool = False
 
     # --- Google Maps Platform (server key only; never shipped in the APK) ---
     server_maps_key: str = ""

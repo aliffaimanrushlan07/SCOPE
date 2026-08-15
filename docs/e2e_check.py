@@ -14,7 +14,9 @@ Usage:
 
 from __future__ import annotations
 
+import csv
 import io
+import pathlib
 import sys
 import uuid
 
@@ -50,8 +52,44 @@ def make_image(seed: int, colour: tuple[int, int, int]) -> bytes:
     return buf.getvalue()
 
 
+def dataset_images(label: str, count: int) -> list[bytes] | None:
+    """Real photographs from the held-out test split, if the dataset is present.
+
+    Preferred over synthetic images once a trained model is wired in: a genuine
+    cigarette detector correctly REJECTS procedurally generated noise, so the
+    seed search below can never satisfy passed=True against a real model. Using
+    real images tests the same API contract without depending on the classifier
+    misbehaving.
+    """
+    manifest = pathlib.Path(__file__).resolve().parents[1] / "ml" / "data" / "manifest.csv"
+    if not manifest.exists():
+        return None
+
+    ml_dir = manifest.parent.parent
+    chosen: list[bytes] = []
+    with manifest.open() as handle:
+        for row in csv.DictReader(handle):
+            if row["split"] != "test" or row["label"] != label:
+                continue
+            path = ml_dir / row["path"]
+            if path.exists():
+                chosen.append(path.read_bytes())
+                if len(chosen) == count:
+                    return chosen
+    return chosen or None
+
+
 def find_images(target_pass: bool, count: int) -> list[bytes]:
-    """Search seeds until we find images the stub scores the way we need."""
+    """Images the classifier scores the way this test needs.
+
+    Uses real dataset photographs when available, and falls back to a search
+    over synthetic images so the suite still runs on a machine that has the
+    code but not the 450 MB image corpus.
+    """
+    real = dataset_images("smoking" if target_pass else "notsmoking", count)
+    if real and len(real) == count:
+        return real
+
     found: list[bytes] = []
     for seed in range(500):
         data = make_image(seed, (seed % 256, 100, 150))
@@ -66,7 +104,13 @@ def find_images(target_pass: bool, count: int) -> list[bytes]:
             found.append(data)
             if len(found) == count:
                 return found
-    raise RuntimeError(f"Could not find {count} images with passed={target_pass}")
+
+    raise RuntimeError(
+        f"Could not find {count} images with passed={target_pass}.\n"
+        "With a real model wired in this is expected for passed=True — synthetic "
+        "noise should never look like a cigarette. Provide the dataset "
+        "(ml/data/manifest.csv) or set AI_STUB_MODE=true to run this suite."
+    )
 
 
 print(f"\nSCOPE API end-to-end check -> {BASE}\n")

@@ -21,7 +21,7 @@ from app.config import get_settings
 from app.routers import classify, geo, public, reports
 from app.routers.admin import analytics, auth, infographics
 from app.routers.admin import reports as admin_reports
-from app.services import storage
+from app.services import inference, storage
 
 settings = get_settings()
 logger = logging.getLogger("scope")
@@ -43,6 +43,23 @@ async def lifespan(app: FastAPI):
         settings.ai_model_version,
         settings.ai_confidence_threshold,
     )
+
+    # Load the classifier now, not on the first request. It takes seconds and
+    # holds a gigabyte of weights; paying that cost inside a reporter's S10
+    # request would look like the app hanging.
+    if settings.ai_stub_mode:
+        logger.warning("AI_STUB_MODE is on — confidence scores are NOT real.")
+    elif inference.is_available():
+        try:
+            inference.load_model()
+        except Exception:
+            logger.exception("Classifier failed to load; falling back to the stub.")
+    else:
+        logger.warning(
+            "No model at %s — the stub will be used and scores are NOT real.",
+            inference.model_path(),
+        )
+
     yield
 
 
