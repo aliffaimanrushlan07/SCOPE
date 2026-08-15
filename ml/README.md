@@ -4,178 +4,222 @@ The evidence classifier used at **S10**. Given a photograph, it returns
 P(smoking violation); the backend compares that against a configurable
 threshold and accepts the report when at least one photograph clears it.
 
-This is the project's principal technical contribution and the only component
-whose duration cannot be predicted. Start it early.
-
 ---
 
-## Status
+## Status — complete
 
 | Step | State |
 |---|---|
-| Tooling (`prepare_dataset.py`, `select_threshold.py`, notebook) | ✅ built and tested |
-| Dataset downloaded | ⬜ **you** — see below |
-| Model fine-tuned | ⬜ |
-| Threshold chosen | ⬜ — the one open item in §8 of the flow document |
-| Wired into the backend | ⬜ — a stub is in place so the app already runs end to end |
+| Tooling (`prepare_dataset.py`, `select_threshold.py`, notebook) | ✅ |
+| Dataset assembled and split | ✅ 1,941 images |
+| Model fine-tuned | ✅ `vit-scope-v1` |
+| Threshold chosen | ✅ **0.70** |
+| Wired into the backend | ✅ real inference, stub removed |
 
 ---
 
-## 1. Get the data
+## Results
 
-**You need to download these yourself.** Each requires accepting the host's
-terms or holding an account, which is not something I can do on your behalf —
-and the licence you agree to has to be one *you* are willing to cite.
+Fine-tuned `vit_base_patch16_224_imagenet21k` on 1,358 training images,
+validated on 290, and evaluated **once** on 293 held-out test images.
 
-### Recommended: Mendeley Data — "Smoking vs not-smoking"
-
-| | |
+| Metric at threshold 0.70 | Value |
 |---|---|
-| **Licence** | **CC BY 4.0** — free to use, including commercially, with attribution |
-| **DOI** | `10.17632/7b52hhzs3r.1` |
-| **Contributor** | Ali Khan |
-| **Size** | 2,400 images — 1,200 smoking, 1,200 not-smoking (already balanced) |
-| **URL** | <https://data.mendeley.com/datasets/7b52hhzs3r/1> |
+| Precision | **0.977** |
+| Recall | **0.916** |
+| F1 | 0.945 |
+| Accuracy | 0.949 |
+| Confusion | TP 130 · FP 3 · FN 12 · TN 148 |
 
-The reason to prefer this one: its **negative class is deliberately hard**. It
-contains people drinking, using inhalers, and holding phones to their face —
-the exact gestures that a naive classifier mistakes for smoking. A model
-trained against easy negatives scores well in a notebook and then fails in
-front of your examiners.
+Mean score for smoking images **0.939**, for non-smoking **0.055** — a
+separation of 0.884, meaning the model is decisive rather than hedging.
 
-**Attribution is a licence condition, not a courtesy.** Cite it in Chapter 5
-and in your references.
+### Threshold sweep
 
-### Supplementary options
-
-| Source | Licence | Note |
-|---|---|---|
-| [Kaggle — Smoker Detection](https://www.kaggle.com/datasets/sujaykapadnis/smoking) | Check on the page | 1,120 images; overlaps heavily with the Mendeley set, so de-duplicate |
-| [Roboflow Universe — smoking](https://universe.roboflow.com/browse/smoking) | Varies by dataset — several CC BY 4.0, some Public Domain | Object-detection datasets; export as **classification** folders |
-
-Check the licence on the specific dataset page before downloading. Some
-Roboflow datasets are Public Domain, others CC BY 4.0 — the requirement
-differs and you must record which you used.
-
-### The gap you should know about
-
-None of these are photographs taken on a phone, at a distance, in a Malaysian
-food court — which is what your app will actually receive. Your S10 failure
-reasons ("subject too far", "image too blurry") describe conditions the
-training data barely contains.
-
-If you have time, photograph a few dozen realistic scenes yourself (a friend
-holding an unlit cigarette is a perfectly good positive for framing purposes,
-and an honest one to describe in the report). Even 50 in-domain images
-noticeably improve real-world behaviour, and being able to say you addressed
-the domain gap is a strong point at viva.
-
-### Where to put it
-
-```
-ml/data/raw/smoking/*.jpg
-ml/data/raw/notsmoking/*.jpg
-```
-
-Folder names must match exactly. `ml/data/` is gitignored — the image corpus
-never enters the repository.
+| Threshold | Precision | Recall | F1 | TP | FP | FN | TN |
+|---|---|---|---|---|---|---|---|
+| 0.10 | 0.892 | 0.993 | 0.940 | 141 | 17 | 1 | 134 |
+| 0.20 | 0.928 | 0.993 | 0.959 | 141 | 11 | 1 | 140 |
+| 0.30 | 0.945 | 0.965 | 0.955 | 137 | 8 | 5 | 143 |
+| 0.33 | 0.951 | 0.965 | 0.958 | 137 | 7 | 5 | 144 |
+| 0.50 | 0.964 | 0.951 | 0.957 | 135 | 5 | 7 | 146 |
+| **0.70** | **0.977** | **0.916** | **0.945** | **130** | **3** | **12** | **148** |
+| 0.80 | 0.977 | 0.901 | 0.938 | 128 | 3 | 14 | 148 |
+| 0.90 | 0.976 | 0.873 | 0.922 | 124 | 3 | 18 | 148 |
+| 0.95 | 0.992 | 0.866 | 0.925 | 123 | 1 | 19 | 150 |
 
 ---
 
-## 2. Prepare the split
+## Why 0.70 and not the best-F1 point
+
+`select_threshold.py` recommends **0.33** — the highest recall that still
+holds precision at 0.95, and close to the best-F1 point. **0.70 was chosen
+instead**, and the reasoning matters more than the number.
+
+### The ≥1-photo rule changes the arithmetic
+
+A report passes when **any one** of up to three photographs clears the
+threshold (§8). So a false positive gets **three independent chances** per
+report, while a false negative requires **all three** photographs to fail.
+Per-photo metrics do not show this.
+
+| Threshold | Per-photo FPR | Per-photo FNR | **Invalid report accepted** | **Genuine 3-photo report rejected** |
+|---|---|---|---|---|
+| 0.33 | 4.64% | 3.52% | **13.27%** | 0.004% |
+| 0.50 | 3.31% | 4.93% | 9.61% | 0.012% |
+| **0.70** | **1.99%** | **8.45%** | **5.84%** | **0.060%** |
+| 0.90 | 1.99% | 12.68% | 5.84% | 0.204% |
+| 0.95 | 0.66% | 13.38% | 1.97% | 0.240% |
+
+Moving from 0.33 to 0.70 **more than halves** the rate at which an invalid
+report reaches enforcement, while the chance of wrongly rejecting a genuine
+three-photograph report stays below one in a thousand.
+
+### Why not higher
+
+0.95 looks better still — until you notice its 0.66% false-positive rate rests
+on **exactly one** misclassified image out of 151. A rate estimated from a
+single sample is not a measurement. 0.70 sits on a **plateau**: the
+false-positive rate is 1.99% at 0.70, 0.80 and 0.90 alike, so small errors in
+the estimate do not move the operating point. It is a shelf, not a cliff edge.
+
+0.95 would also reject 13.4% of genuine single-photograph reports, and many
+reporters will take only one photograph.
+
+### The asymmetry this reflects
+
+§S10 requires the operating point to keep **false positives** low. The two
+errors do not cost the same:
+
+- A **false positive** forwards an invalid report to enforcement. Administrators
+  are read-only and the AI decision is final, so nothing downstream catches it.
+- A **false negative** asks the reporter to retake a photograph. Recoverable,
+  and they are standing there.
+
+---
+
+## Reproducing this
+
+### 1. Data
+
+[Kaggle / Mendeley smoking-vs-not-smoking corpus](https://data.mendeley.com/datasets/7b52hhzs3r/1)
+— **CC BY 4.0**, attribution required. Cite it in Chapter 5.
+
+Downloaded as `training_data/` + `validation_data/` + an unlabelled
+`testing_data/`. The unlabelled folder is unusable and was discarded; the two
+labelled folders were **merged and re-split from scratch** rather than reusing
+the publisher's split, because that split was not verified leakage-free — and
+in fact 69 duplicate images were found spanning it.
+
+```
+ml/data/raw/smoking/       1,005 images
+ml/data/raw/notsmoking/    1,005 images
+```
+
+### 2. Split
 
 ```bash
 ./backend/.venv/bin/python ml/prepare_dataset.py
 ```
 
-Writes `ml/data/manifest.csv` and `ml/data/report.md`.
+| Split | smoking | notsmoking | Total |
+|---|---|---|---|
+| train | 660 | 698 | 1,358 |
+| val | 141 | 149 | 290 |
+| test | 142 | 151 | 293 |
+| **Total** | **943** | **998** | **1,941** |
 
-What it does, and why each part matters:
+69 duplicates removed by perceptual hash. Whole hash groups are assigned to a
+single split, so near-identical frames cannot straddle train and test. Seeded
+and reproducible; splitting happens before augmentation.
 
-- **De-duplicates by perceptual hash.** Web-scraped sets repeat images, often
-  resized or re-encoded. A byte hash misses those; a difference hash catches
-  them. A duplicate spanning train and test means testing on a memorised image.
-- **Assigns whole hash groups to one split.** Near-identical frames can never
-  straddle the train/test boundary.
-- **Stratifies by class**, so the test set does not drift toward one label.
-- **Splits before augmentation.** Augmenting first scatters variants of one
-  source image across all three splits — the same leakage, better disguised.
-- **Seeded**, so the split is reproducible and your reported accuracy is
-  checkable by someone else.
-
-`ml/data/report.md` is a composition table ready to paste into Chapter 5.
-
----
-
-## 3. Fine-tune
-
-Open `ml/notebooks/finetune_vit.ipynb` in **Google Colab**, set Runtime → T4
-GPU, and work down the cells. On CPU an epoch takes hours; on a T4, minutes.
-
-**A stack note worth knowing:** HuggingFace `transformers` has *removed*
-TensorFlow support, so the commonly-cited `TFViTForImageClassification` no
-longer exists. The notebook uses **KerasHub**, which is the Keras-native
-replacement, runs on the TensorFlow backend, and keeps the project consistent
-with Table 3.5 (*TensorFlow / Keras*). No PyTorch is involved.
-
-Training is two-stage: freeze the backbone and train the new head, then
-unfreeze and fine-tune at a much lower learning rate. Doing it in one stage
-lets large random gradients from the untrained head destroy the pre-trained
-features that make transfer learning work at all.
-
-Outputs to download: `test_scores.csv`, `training_curves.png`,
-`vit-scope-v1.keras`, `model_metadata.json`.
-
----
-
-## 4. Choose the threshold
+### 3. Bundle for Colab
 
 ```bash
-./backend/.venv/bin/python ml/select_threshold.py ml/artifacts/test_scores.csv
+./backend/.venv/bin/python ml/make_colab_bundle.py
 ```
 
-This resolves the one item `SCOPE-System-Flow-Revised.md` §8 leaves open, and
-it is an **empirical result, not a design choice**.
+453 MB → 23 MB by resizing to 256 px, which the model would do anyway.
 
-It does *not* pick the best-F1 point, because the two errors do not cost the
-same:
+### 4. Train
 
-- A **false positive** forwards an invalid report to enforcement. Administrators
-  are read-only and the AI decision is final, so nothing downstream catches it.
-- A **false negative** asks a reporter to retake a photograph. Recoverable, and
-  they are standing right there.
+`ml/notebooks/finetune_vit.ipynb` in Google Colab, Runtime → **T4 GPU**.
 
-So it holds precision at or above a target (default 0.95) and takes the best
-recall available under that constraint. Print the sweep table into Chapter 5 —
-it is the evidence for the number you chose.
+Two stages: freeze the backbone and train the head, then unfreeze and
+fine-tune at a lower learning rate.
 
-Then set it:
+> **`activation='softmax'` is required and is not the default.** KerasHub ships
+> `activation=None`, which returns raw logits. Pairing that with
+> `from_logits=False` silently trains against a broken objective — the first
+> run here did exactly that and produced negative "confidence" scores no
+> threshold could act on. The notebook now asserts the output range immediately
+> after building the model, before a training run is spent.
+
+Uses **KerasHub**, not HuggingFace `transformers`, which has removed
+TensorFlow support entirely — `TFViTForImageClassification` no longer exists.
+KerasHub is Keras-native on the TensorFlow backend, so Table 3.5 stays accurate
+and no PyTorch is involved.
+
+### 5. Threshold
+
+```bash
+./backend/.venv/bin/python ml/select_threshold.py ml/artifacts/test_scores_backend.csv
+```
+
+Scores were recomputed **through the backend's own inference code**, not taken
+from the notebook. Resizing with PIL instead of TensorFlow shifted individual
+scores by up to **0.46**, which would have silently invalidated the
+calibration.
+
+### 6. Backend
 
 ```
-AI_CONFIDENCE_THRESHOLD=<recommended>
+AI_MODEL_PATH=../ml/artifacts/vit-scope-v1.keras
 AI_MODEL_VERSION=vit-scope-v1
+AI_CONFIDENCE_THRESHOLD=0.70
+AI_STUB_MODE=false
 ```
 
-The backend reads the threshold per request, so it can be retuned later
-without rebuilding the mobile app — which is what §S10 requires.
+The model loads once at application startup. The threshold is read per request,
+so it can be retuned without rebuilding the mobile app — which is what §S10
+requires.
 
 ---
 
-## 5. Wire it into the backend
+## Limitations to state honestly in the report
 
-Replace `_score_image` in `backend/app/services/inference.py`. The public
-signature of `classify_photos` is the contract — nothing outside that file
-changes, and the mobile app needs no rebuild.
+**Domain gap.** The training images are web-sourced photographs, not phone
+photos taken at a distance in a Malaysian food court. Real submissions will be
+further from the camera, more motion-blurred, and worse lit. Measured accuracy
+on this test set is an **upper bound** on field performance.
 
-Load the model **once at application startup**, never per request. Loading a
-ViT per request makes S10 unusable.
+**Failure reasons are heuristic.** The model is a single-label classifier: it
+reports how confident it is that a violation is present, not *why* it is
+unconvinced. The "too blurry" / "too far" messages are presentational bands
+over the confidence score, not measurements. Deriving blur from a Laplacian
+variance check and distance from a detection bounding box would make them real.
+
+**No human check.** FR12 was removed, so a false positive reaches enforcement
+uncorrected. The defence is that the threshold is tuned to minimise exactly
+that (3 false positives in 151 non-violations), and the dashboard is advisory —
+it informs patrol planning rather than triggering enforcement against a named
+party.
+
+**Single evaluation run.** The test split was used once. Figures are not
+averaged over repeated runs with different seeds, so they carry the variance of
+a single training run.
 
 ---
 
-## What to keep for Chapter 5
+## Files
 
-- `ml/data/report.md` — dataset composition and cleaning table
-- `training_curves.png` — accuracy and loss, train vs validation
-- The threshold sweep table from `select_threshold.py`
-- The chosen threshold **and the reasoning for it**
-- Dataset sources, licences, and attributions
+| Path | Purpose |
+|---|---|
+| `prepare_dataset.py` | De-duplicate, split, manifest |
+| `make_colab_bundle.py` | Resize + zip for upload |
+| `select_threshold.py` | Threshold sweep and recommendation |
+| `notebooks/finetune_vit.ipynb` | Training |
+| `data/manifest.csv` | The authoritative split (gitignored) |
+| `data/report.md` | Composition table for Chapter 5 |
+| `artifacts/vit-scope-v1.keras` | Trained model, ~982 MB (gitignored) |
+| `artifacts/test_scores_backend.csv` | Scores used to pick the threshold |
