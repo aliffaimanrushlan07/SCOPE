@@ -67,6 +67,38 @@ def load_scores(path: Path) -> list[tuple[int, float]]:
     if not any(y for y, _ in rows) or all(y for y, _ in rows):
         sys.exit("Scores file contains only one class; both are needed.")
 
+    # Catch malformed scores before sweeping. Without this the sweep "succeeds"
+    # and reports recall 0.000 at every threshold, which reads like a hopeless
+    # model when the real problem is that the file does not contain
+    # probabilities at all.
+    low = min(s for _, s in rows)
+    high = max(s for _, s in rows)
+
+    if low < 0.0 or high > 1.0:
+        sys.exit(
+            f"Scores are outside [0, 1] — they range from {low:.4f} to {high:.4f}.\n"
+            "\n"
+            "These look like LOGITS, not probabilities. The model was built\n"
+            "without a softmax activation, so its outputs are unbounded and can\n"
+            "be negative.\n"
+            "\n"
+            "Fix in the training notebook, cell 4:\n"
+            "    ViTImageClassifier.from_preset(PRESET, num_classes=2,\n"
+            "                                   activation='softmax')\n"
+            "and keep SparseCategoricalCrossentropy(from_logits=False).\n"
+            "\n"
+            "The mismatch also breaks TRAINING, not just these scores, so the\n"
+            "model must be retrained rather than merely re-evaluated."
+        )
+
+    if high - low < 0.05:
+        sys.exit(
+            f"All scores sit within {low:.4f}–{high:.4f}, a range too narrow to\n"
+            "threshold. The model is predicting nearly the same value for every\n"
+            "image, which usually means training did not converge — check that\n"
+            "the loss actually fell across epochs."
+        )
+
     return rows
 
 
