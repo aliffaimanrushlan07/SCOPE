@@ -48,3 +48,6 @@ mobile/.flutter-plugins*
 
 # Dashboard build output
 dashboard/dist/
+
+# dev.sh runtime logs
+.devlogs/
