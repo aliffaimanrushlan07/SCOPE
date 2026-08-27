@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../core/settings.dart';
 import '../core/theme.dart';
+import '../router.dart';
 import '../widgets/scope_logo.dart';
 
 /// S15 — About SCOPE.
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
-  // TODO(fyp): replace with the real build number before submission.
-  static const String _version = '0.3.0';
-  static const String _build = 'sprint-3';
+  // Kept in step with the version line in pubspec.yaml (1.0.0+1).
+  static const String _version = '1.0.0';
+  static const String _build = '1';
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +100,23 @@ class AboutScreen extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: Gap.md),
+
+          // The only entry point to the connection settings, and deliberately
+          // the least prominent place in the app — it is a demonstration
+          // affordance, not something a reporter should ever need.
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.settings_ethernet,
+                color: ScopeTheme.inkMuted),
+            title: const Text('Connection settings'),
+            subtitle: Text(
+              context.watch<AppSettings>().baseUrl,
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(Routes.settings),
           ),
           const SizedBox(height: Gap.lg),
         ],

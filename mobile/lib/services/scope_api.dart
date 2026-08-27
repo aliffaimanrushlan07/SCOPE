@@ -5,6 +5,7 @@ import 'package:http_parser/http_parser.dart';
 
 import '../core/api_client.dart';
 import '../core/config.dart';
+import '../core/settings.dart';
 import '../models/api_models.dart';
 import '../models/report_draft.dart';
 
@@ -15,8 +16,12 @@ class ScopeApi {
   final ApiClient _client;
 
   /// Resolves a stored media path to a full URL.
+  ///
+  /// Static, and so reads the current base URL directly: the callers are image
+  /// loaders (NetworkImage in S14, the infographic viewer) that have no
+  /// BuildContext at the point the URL is needed.
   static String mediaUrl(String storagePath) =>
-      '${AppConfig.apiBaseUrl}/media/$storagePath';
+      '${AppSettings.instance.baseUrl}/media/$storagePath';
 
   // -------------------------------------------------------------------------
   // S10 — evidence validation
@@ -175,12 +180,16 @@ class ScopeApi {
 
   /// True when the backend is reachable. Used by S01 to decide whether Home
   /// should show its offline state.
-  Future<bool> ping() async {
+  ///
+  /// [baseUrl] overrides the configured address, which lets the connection
+  /// settings screen test an address the reporter has typed but not yet saved.
+  /// Without it, testing would mean saving a possibly-wrong address first.
+  Future<bool> ping({String? baseUrl}) async {
     try {
       final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 3),
-        receiveTimeout: const Duration(seconds: 3),
+        baseUrl: baseUrl ?? AppSettings.instance.baseUrl,
+        connectTimeout: AppConfig.pingTimeout,
+        receiveTimeout: AppConfig.pingTimeout,
       ));
       final response = await dio.get<Map<String, dynamic>>('/health');
       return response.statusCode == 200;

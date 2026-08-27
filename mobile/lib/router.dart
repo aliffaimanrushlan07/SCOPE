@@ -12,6 +12,7 @@ import 'screens/s11_location.dart';
 import 'screens/s13_success.dart';
 import 'screens/s14_history.dart';
 import 'screens/s15_about.dart';
+import 'screens/s16_settings.dart';
 
 /// Route names for all fifteen screens and states.
 ///
@@ -41,6 +42,10 @@ class Routes {
   static const success = '/report/success';
   static const history = '/history';
   static const about = '/about';
+
+  /// Not one of the fifteen. A demonstration affordance reached only from
+  /// About — see screens/s16_settings.dart.
+  static const settings = '/settings';
 }
 
 final GoRouter appRouter = GoRouter(
@@ -91,6 +96,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: Routes.about,
       builder: (context, state) => const AboutScreen(),
+    ),
+    GoRoute(
+      path: Routes.settings,
+      builder: (context, state) => const SettingsScreen(),
     ),
   ],
   errorBuilder: (context, state) => Scaffold(

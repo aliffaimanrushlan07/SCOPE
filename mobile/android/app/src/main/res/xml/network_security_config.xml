@@ -1,15 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    DEVELOPMENT ONLY.
+    DEVELOPMENT AND DEMONSTRATION ONLY.
 
     Android 9+ blocks cleartext HTTP by default. The SCOPE backend runs over
-    plain HTTP on a development machine, so the emulator and a phone on the
+    plain HTTP on a development machine, so the emulator and a handset on the
     same network need an exception to reach it.
 
-    The exception is scoped to local addresses only — it is NOT a blanket
+    The exception is scoped to specific local addresses. It is NOT a blanket
     android:usesCleartextTraffic="true", which would permit cleartext to any
     host on the internet and would be indefensible for an application that
     transmits photographs of identifiable individuals.
+
+    WHY THE ADDRESSES ARE ENUMERATED
+
+    The demonstration runs both the laptop and the handset as clients of an
+    iPhone Personal Hotspot. iOS pins that network to 172.20.10.0/28: the
+    iPhone itself is always 172.20.10.1 and DHCP assigns clients .2 through
+    .14. The laptop's address is therefore not fixed, but it is drawn from a
+    set of only thirteen possibilities.
+
+    Android's network security configuration has no CIDR or wildcard support —
+    each host must be named. Thirteen entries is a small price for keeping the
+    strict posture above, so they are simply listed rather than giving up and
+    permitting cleartext everywhere.
 
     REMOVE THIS FILE (and the networkSecurityConfig attribute in
     AndroidManifest.xml) before any real deployment. Production traffic must
@@ -19,9 +32,31 @@
     <domain-config cleartextTrafficPermitted="true">
         <!-- The Android emulator's alias for the host machine -->
         <domain includeSubdomains="false">10.0.2.2</domain>
-        <!-- A physical handset reaching the development Mac over Wi-Fi.
-             Replace with your machine's address from: ipconfig getifaddr en0 -->
-        <domain includeSubdomains="false">192.168.0.1</domain>
+
+        <!-- Loopback. 127.0.0.1 also covers the USB fallback path:
+             adb reverse tcp:8000 tcp:8000 -->
         <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+
+        <!-- iOS Personal Hotspot client range, 172.20.10.0/28.
+             .1 is the iPhone itself; the laptop is one of .2 to .14. -->
+        <domain includeSubdomains="false">172.20.10.2</domain>
+        <domain includeSubdomains="false">172.20.10.3</domain>
+        <domain includeSubdomains="false">172.20.10.4</domain>
+        <domain includeSubdomains="false">172.20.10.5</domain>
+        <domain includeSubdomains="false">172.20.10.6</domain>
+        <domain includeSubdomains="false">172.20.10.7</domain>
+        <domain includeSubdomains="false">172.20.10.8</domain>
+        <domain includeSubdomains="false">172.20.10.9</domain>
+        <domain includeSubdomains="false">172.20.10.10</domain>
+        <domain includeSubdomains="false">172.20.10.11</domain>
+        <domain includeSubdomains="false">172.20.10.12</domain>
+        <domain includeSubdomains="false">172.20.10.13</domain>
+        <domain includeSubdomains="false">172.20.10.14</domain>
+
+        <!-- The development Mac on the home LAN, for testing the release
+             build before demonstration day. Update to match:
+                 ipconfig getifaddr en0 -->
+        <domain includeSubdomains="false">192.168.0.10</domain>
     </domain-config>
 </network-security-config>

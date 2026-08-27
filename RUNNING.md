@@ -132,7 +132,7 @@ This opens Flutter's interactive console in the terminal:
 
 **Stop:** press **q** in that terminal, or **Ctrl+C**.
 
-### Run on a physical Android phone instead
+### Run on a physical Android phone over USB
 
 1. Connect via USB, enable USB debugging on the phone
 2. Confirm it's detected:
@@ -149,6 +149,9 @@ This opens Flutter's interactive console in the terminal:
    flutter run --dart-define=API_BASE_URL=http://<your-mac-ip>:8000
    ```
 
+For the installed demo APK — which cannot be given a `--dart-define` — set the
+address on the phone instead. See [Demo APK](#demo-apk) below.
+
 ### Run on the iPhone (presentation device)
 
 Same as above, but Xcode must be able to sign the app to your device first
@@ -159,6 +162,82 @@ flutter run --dart-define=API_BASE_URL=http://<your-mac-ip>:8000
 ```
 ⚠️ Free Apple ID signing expires after 7 days — rebuild onto the phone within
 a week of presenting.
+
+---
+
+## Demo APK
+
+A standing release APK on your own Android phone, reaching the backend on this
+Mac over a wireless hotspot. No cable, and no rebuild when the address changes.
+
+### Build it
+
+```bash
+cd ~/Desktop/PROJECT/scope/mobile && flutter build apk --release
+```
+
+Takes about 2 minutes. Output:
+`build/app/outputs/flutter-apk/app-release.apk` (~57 MB).
+
+Copy it somewhere you can upload from:
+```bash
+cp ~/Desktop/PROJECT/scope/mobile/build/app/outputs/flutter-apk/app-release.apk ~/Desktop/PROJECT/scope-demo.apk
+```
+
+Signed with the **debug keystore** on purpose. The Google Maps Android key is
+restricted by package name plus SHA-1 certificate fingerprint, so switching to
+a new release keystore would blank out S06 and S11 until that new fingerprint
+was registered in the Google Cloud console.
+
+### Install it
+
+Transfer `scope-demo.apk` to the phone (Drive, Telegram, AirDroid) and open it.
+Android will ask permission the first time — "Install unknown apps" must be
+allowed for whichever app you transferred with (Settings → Apps → Special
+access → Install unknown apps).
+
+The phone must be **Android 10 or newer** (`minSdk = 29`).
+
+### Network: the iPhone hotspot path
+
+Both the MacBook and the Android phone join the **iPhone's** Personal Hotspot.
+Both then keep internet access, which matters because S06 and S11 fetch Google
+Maps tiles and render blank without it.
+
+1. iPhone: Settings → Personal Hotspot → on. **Leave this screen open** — iOS
+   switches the hotspot off when nothing is connected to it.
+2. MacBook: join the hotspot. Android phone: join the same hotspot.
+3. MacBook — find the address the hotspot gave it:
+   ```bash
+   ipconfig getifaddr en0
+   ```
+   It will be `172.20.10.x`. iOS pins this network to `172.20.10.0/28`, so the
+   Mac is always somewhere between `.2` and `.14`.
+4. MacBook — start everything:
+   ```bash
+   cd ~/Desktop/PROJECT/scope && ./dev.sh
+   ```
+5. Android — open SCOPE → **About SCOPE** (via the SCOPE logo at the top) →
+   **Connection settings**. Type the address from step 3, tap **Test
+   connection**, then **Save**.
+
+   Typing just `172.20.10.4` is enough — `http://` and `:8000` are filled in.
+
+The address is remembered between launches, so step 5 is only needed when DHCP
+hands the Mac a different one.
+
+**Test connection** is the diagnostic worth using before you present: it tells
+you whether the address is reachable at all, separating a mistyped IP from a
+backend that isn't running.
+
+### Fallback if the wireless path fails
+
+USB cable, no network at all:
+```bash
+adb reverse tcp:8000 tcp:8000
+```
+Then set the address in the app to `http://127.0.0.1:8000`. This is already
+permitted by the app's cleartext policy.
 
 ---
 
@@ -188,3 +267,14 @@ cd ~/Desktop/PROJECT/scope/mobile && flutter run
 | `flutter run` can't reach the backend | Wrong base URL for the target device | Emulator needs no flag; a physical device needs `--dart-define=API_BASE_URL=http://<mac-ip>:8000` |
 | Emulator camera hangs on a spinner | AVD set to `webcam0` instead of `emulated` | See `SCOPE-Build-Guide.md` — switch `hw.camera.back` in the AVD config |
 | Port 8000 or 5173 already in use | A previous run wasn't stopped cleanly | `lsof -iTCP:8000 -sTCP:LISTEN` (or `:5173`) to find the PID, then `kill <pid>` |
+
+### Demo APK on the hotspot
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| **Test connection** says no response | Wrong address, or the backend isn't running | Re-check `ipconfig getifaddr en0` on the Mac; confirm `curl http://127.0.0.1:8000/health` answers there |
+| Every request fails but Test connection passed | The Mac moved to a different network after you saved | Re-run step 3 and re-save the address |
+| App reaches the backend, but S06/S11 maps are blank | No internet on the phone, or the Maps key restriction | Confirm the iPhone hotspot has mobile data; confirm the debug SHA-1 is still registered for the Maps key |
+| Requests fail only in the release APK, never in `flutter run` | The Mac's address is outside the cleartext allowlist | Add it to `mobile/android/app/src/main/res/xml/network_security_config.xml` and rebuild — Android blocks cleartext to unlisted hosts |
+| Hotspot drops when you stop looking at the iPhone | iOS switches Personal Hotspot off when no client is attached | Keep the Personal Hotspot settings screen open until both devices have joined |
+| Report submission returns "You have submitted several reports recently" | Per-device hourly rate limit | `RATE_LIMIT_PER_DEVICE_PER_HOUR` in `backend/.env` — raised to 50 for demos, designed value is 5 |

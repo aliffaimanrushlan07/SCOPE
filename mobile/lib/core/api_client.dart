@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'config.dart';
+import 'settings.dart';
 
 /// Distinguishes the failure modes S10 and S12 must treat differently.
 ///
@@ -37,9 +38,10 @@ class ApiException implements Exception {
 /// Thin wrapper over Dio that turns transport errors into [ApiException].
 class ApiClient {
   ApiClient({Dio? dio})
-      : _dio = dio ??
+      : _ownsDio = dio == null,
+        _dio = dio ??
             Dio(BaseOptions(
-              baseUrl: '${AppConfig.apiBaseUrl}${AppConfig.apiPrefix}',
+              baseUrl: '${AppSettings.instance.baseUrl}${AppConfig.apiPrefix}',
               connectTimeout: AppConfig.requestTimeout,
               receiveTimeout: AppConfig.requestTimeout,
               sendTimeout: AppConfig.requestTimeout,
@@ -47,6 +49,10 @@ class ApiClient {
             ));
 
   final Dio _dio;
+
+  /// False when a Dio was injected — a test supplying its own client with a
+  /// mock adapter has already chosen a base URL, and must keep it.
+  final bool _ownsDio;
 
   Dio get raw => _dio;
 
@@ -78,6 +84,16 @@ class ApiClient {
           ));
 
   Future<Response<T>> _guard<T>(Future<Response<T>> Function() request) async {
+    // Resolved per request rather than in the constructor. ScopeApi is a
+    // single long-lived Provider instance, so a base URL captured at
+    // construction would go stale the moment someone corrects the address on
+    // the settings screen — and correcting it mid-demonstration, without an
+    // app restart, is the entire point of that screen.
+    if (_ownsDio) {
+      _dio.options.baseUrl =
+          '${AppSettings.instance.baseUrl}${AppConfig.apiPrefix}';
+    }
+
     try {
       return await request();
     } on DioException catch (e) {
