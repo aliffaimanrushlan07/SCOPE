@@ -300,24 +300,3 @@ tbody tr.clickable:hover {
   color: var(--muted);
   font-size: 14px;
 }
-
-/* --- Leaflet -------------------------------------------------------------- */
-
-.leaflet-container {
-  border-radius: var(--radius);
-  font: inherit;
-}
-
-/* The cluster marker. Count is encoded three ways at once — diameter, fill
-   and the numeral — so the map survives colour-blind viewing and greyscale
-   printing. Section 10.4. */
-.cluster {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 3px solid #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-  font-weight: 700;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-}

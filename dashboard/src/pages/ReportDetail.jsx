@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { MapContainer, Marker, TileLayer } from 'react-leaflet'
+import { Map, Marker } from '@vis.gl/react-google-maps'
 import * as api from '../api/endpoints'
 import { errorMessage, mediaUrl } from '../api/client'
 import {
@@ -11,8 +11,11 @@ import {
   TopBar,
   formatDateTime,
 } from '../components/ui'
-import 'leaflet/dist/leaflet.css'
-import { pinIcon } from '../components/leafletIcons'
+import {
+  PIN_ICON_ANCHOR,
+  PIN_ICON_SIZE,
+  PIN_ICON_URL,
+} from '../components/leafletIcons'
 
 /**
  * D05 — Report Detail, READ-ONLY.
@@ -49,7 +52,7 @@ export default function ReportDetail() {
   if (!report) return null
 
   const photo = report.photos[activePhoto]
-  const position = [Number(report.latitude), Number(report.longitude)]
+  const position = { lat: Number(report.latitude), lng: Number(report.longitude) }
 
   return (
     <>
@@ -154,18 +157,30 @@ export default function ReportDetail() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <section className="card" style={{ padding: 18 }}>
               <h3 style={{ fontSize: 15, marginBottom: 12 }}>Location</h3>
-              <MapContainer
-                center={position}
-                zoom={16}
-                style={{ height: 200, width: '100%' }}
-                scrollWheelZoom={false}
+              <Map
+                // Sized inline, not via className: <Map> forwards one or the
+                // other to the map element and drops `style` whenever
+                // `className` is set, which silently collapses it to zero
+                // height. This card has no overflow:hidden, so the rounding
+                // has to clip here.
+                style={{
+                  height: 200,
+                  width: '100%',
+                  borderRadius: 'var(--radius)',
+                  overflow: 'hidden',
+                }}
+                defaultCenter={position}
+                defaultZoom={16}
+                // Replaces Leaflet's scrollWheelZoom={false}: a wheel over a
+                // 200px map should scroll the page, not zoom the map out from
+                // under the officer reading it.
+                gestureHandling="cooperative"
+                disableDefaultUI
+                zoomControl
+                clickableIcons={false}
               >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <Marker position={position} icon={pinIcon} />
-              </MapContainer>
+                <LocationPin position={position} />
+              </Map>
 
               <dl style={{ margin: '14px 0 0', fontSize: 13.5 }}>
                 <Row label="Premise" value={report.premise_name || 'Not given'} />
@@ -264,6 +279,36 @@ export default function ReportDetail() {
     </>
   )
 }
+
+/**
+ * The report's location pin.
+ *
+ * Its own component so the google.maps constructors run at *its* render rather
+ * than at ReportDetail's. <Map> renders children only once the API has loaded,
+ * but the props of an element written inline in ReportDetail's JSX are built
+ * when ReportDetail renders — long before window.google exists, which throws
+ * "Cannot read properties of undefined (reading 'maps')" and takes the page
+ * down with it.
+ */
+function LocationPin({ position }) {
+  return (
+    <Marker
+      position={position}
+      icon={{
+        url: PIN_ICON_URL,
+        scaledSize: new window.google.maps.Size(
+          PIN_ICON_SIZE.width,
+          PIN_ICON_SIZE.height,
+        ),
+        anchor: new window.google.maps.Point(
+          PIN_ICON_ANCHOR.x,
+          PIN_ICON_ANCHOR.y,
+        ),
+      }}
+    />
+  )
+}
+
 
 function Row({ label, value }) {
   return (

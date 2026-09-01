@@ -1,19 +1,41 @@
-import { useCallback, useEffect, useState } from 'react'
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Map, useMap } from '@vis.gl/react-google-maps'
+import { GoogleMapsOverlay } from '@deck.gl/google-maps'
+import { HeatmapLayer } from '@deck.gl/aggregation-layers'
 import * as api from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { ErrorState, Loading, TopBar } from '../components/ui'
-import { CLUSTER_BANDS, clusterIcon } from '../components/leafletIcons'
-import 'leaflet/dist/leaflet.css'
+import { CLUSTER_BANDS } from '../components/leafletIcons'
 
-const KUALA_LUMPUR = [3.139, 101.6869]
+const KUALA_LUMPUR = { lat: 3.139, lng: 101.6869 }
+const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
+
+/**
+ * The ramp is derived from the section 10.4 cluster bands rather than picked
+ * afresh, so the page keeps one palette and the density gradient inherits the
+ * bands' monotonically decreasing lightness — still legible to a colour-blind
+ * officer and still readable printed in black and white.
+ */
+const rgb = (hex) => [
+  parseInt(hex.slice(1, 3), 16),
+  parseInt(hex.slice(3, 5), 16),
+  parseInt(hex.slice(5, 7), 16),
+]
+
+const COLOR_RANGE = [[255, 241, 209], ...CLUSTER_BANDS.map((b) => rgb(b.fill))]
 
 /**
  * D03 — Hotspot Map (FR09).
  *
- * Note the deliberate difference from the public map at S06: administrators
- * get clusters resolvable to a location, the public gets a heatmap with no
- * individual pins. Precision for enforcement, privacy for everyone else.
+ * Rendered as a density heatmap over Google Maps. Google removed
+ * `google.maps.visualization.HeatmapLayer` from the Maps JavaScript API in
+ * v3.65 (deprecated May 2025, unavailable May 2026) and it now throws on
+ * construction, so the density layer is deck.gl's HeatmapLayer drawn through a
+ * GoogleMapsOverlay — the replacement Google itself points to.
+ *
+ * The overlay is left in overlaid mode rather than interleaved: interleaved
+ * mode composites into the vector map's own WebGL context, which the
+ * screen-space aggregation layers do not reliably survive.
  *
  * Filters are period only. There is no violation type filter — the field was
  * removed from the data model — and no status filter, because no status exists.
@@ -38,6 +60,24 @@ export default function HotspotMap() {
 
   const total = clusters.reduce((sum, c) => sum + c.count, 0)
 
+  const layers = useMemo(
+    () => [
+      new HeatmapLayer({
+        id: 'hotspots',
+        data: clusters,
+        getPosition: (c) => [c.longitude, c.latitude],
+        getWeight: (c) => c.count,
+        colorRange: COLOR_RANGE,
+        radiusPixels: 48,
+        intensity: 1,
+        threshold: 0.05,
+        opacity: 0.75,
+        pickable: false,
+      }),
+    ],
+    [clusters],
+  )
+
   return (
     <>
       <TopBar title="Hotspot Map">
@@ -57,33 +97,7 @@ export default function HotspotMap() {
             </div>
 
             <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
-              <MapContainer
-                center={KUALA_LUMPUR}
-                zoom={12}
-                style={{ height: 560, width: '100%' }}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {clusters.map((cluster) => (
-                  <Marker
-                    key={`${cluster.latitude},${cluster.longitude}`}
-                    position={[cluster.latitude, cluster.longitude]}
-                    icon={clusterIcon(cluster.count, cluster.band)}
-                  >
-                    <Popup>
-                      <strong>
-                        {cluster.count} report{cluster.count === 1 ? '' : 's'}
-                      </strong>
-                      <br />
-                      <span className="mono">
-                        {cluster.latitude.toFixed(3)}, {cluster.longitude.toFixed(3)}
-                      </span>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+              <SizedMap layers={layers} />
 
               <Legend />
 
@@ -110,7 +124,103 @@ export default function HotspotMap() {
   )
 }
 
+/**
+ * Google Maps latches its size at construction. Mounted into a container that
+ * is still zero-width, it initialises degraded — it paints a narrow strip,
+ * `getBounds()` stays null and `getRenderingType()` never leaves UNINITIALIZED,
+ * and it does not recover when the container is later sized. deck.gl then
+ * refuses to attach at all, because its `_createOverlay` returns early on an
+ * UNINITIALIZED map and never retries. Measuring first and mounting the map
+ * only once the box is real avoids the whole class of problem.
+ */
+function SizedMap({ layers }) {
+  const ref = useRef(null)
+  const [sized, setSized] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      if (width > 0 && height > 0) setSized(true)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={ref} style={{ height: 560, width: '100%' }}>
+      {sized && (
+        <Map
+          mapId={MAP_ID}
+          defaultCenter={KUALA_LUMPUR}
+          defaultZoom={12}
+          gestureHandling="greedy"
+          disableDefaultUI
+          zoomControl
+          style={{ height: '100%', width: '100%' }}
+        >
+          <DeckGLOverlay layers={layers} />
+        </Map>
+      )}
+    </div>
+  )
+}
+
+/**
+ * deck.gl is imperative, so the overlay is attached by hand.
+ *
+ * The attach is deferred until the map reports a rendering type. deck.gl's
+ * `_createOverlay` returns early and never retries when it is handed a map
+ * still reporting UNINITIALIZED, which leaves the overlay silently unattached
+ * — the map renders, the heatmap simply never appears. `useMap()` hands us the
+ * instance well before Google has settled that, so attaching on the first
+ * effect loses the race. Waiting for `renderingtype_changed` (with an `idle`
+ * fallback for the case where the type was already settled and the event never
+ * fires) also guarantees the projection is live, which the overlay's draw path
+ * dereferences without a null check.
+ */
+function DeckGLOverlay({ layers }) {
+  const map = useMap()
+  const [overlay, setOverlay] = useState(null)
+
+  useEffect(() => {
+    if (!map) return undefined
+
+    let instance = null
+
+    const attach = () => {
+      if (instance) return
+      if (map.getRenderingType() === google.maps.RenderingType.UNINITIALIZED) return
+      instance = new GoogleMapsOverlay({ interleaved: false })
+      instance.setMap(map)
+      setOverlay(instance)
+    }
+
+    attach()
+    const listeners = [
+      map.addListener('renderingtype_changed', attach),
+      google.maps.event.addListenerOnce(map, 'idle', attach),
+    ]
+
+    return () => {
+      listeners.forEach((l) => l.remove())
+      if (instance) instance.finalize()
+      setOverlay(null)
+    }
+  }, [map])
+
+  useEffect(() => {
+    if (overlay) overlay.setProps({ layers })
+  }, [overlay, layers])
+
+  return null
+}
+
 function Legend() {
+  const ramp = COLOR_RANGE.map((c) => `rgb(${c.join(',')})`).join(', ')
+
   return (
     <div
       className="card"
@@ -123,25 +233,23 @@ function Legend() {
         fontSize: 12.5,
       }}
     >
-      <div style={{ fontWeight: 650, marginBottom: 8 }}>Reports in cluster</div>
-      {CLUSTER_BANDS.map((band) => (
-        <div
-          key={band.band}
-          style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 5 }}
-        >
-          <span
-            style={{
-              width: 17,
-              height: 17,
-              borderRadius: '50%',
-              background: band.fill,
-              border: '2px solid #fff',
-              boxShadow: '0 0 0 1px var(--line)',
-            }}
-          />
-          {band.label}
-        </div>
-      ))}
+      <div style={{ fontWeight: 650, marginBottom: 8 }}>Report density</div>
+      <div
+        style={{
+          width: 148,
+          height: 12,
+          borderRadius: 6,
+          background: `linear-gradient(to right, ${ramp})`,
+          border: '1px solid var(--line)',
+        }}
+      />
+      <div
+        className="muted"
+        style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}
+      >
+        <span>Sparse</span>
+        <span>Dense</span>
+      </div>
     </div>
   )
 }

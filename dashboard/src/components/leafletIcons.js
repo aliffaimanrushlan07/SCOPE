@@ -1,9 +1,10 @@
-import L from 'leaflet'
-
 /**
- * Leaflet's default marker resolves its images relative to the CSS file, which
- * breaks under a bundler. Defining the icons inline as SVG data URIs avoids the
- * broken-image marker entirely and keeps the dashboard free of binary assets.
+ * How the two map screens draw their data: the D05 location pin and the D03
+ * band scale.
+ *
+ * The pin is an inline SVG data URI rather than a file, which spares the
+ * dashboard a binary asset and any question of how a bundler resolves its
+ * path.
  */
 
 const PIN_SVG = `
@@ -13,12 +14,16 @@ const PIN_SVG = `
   <circle cx="13" cy="13" r="5" fill="#ffffff"/>
 </svg>`
 
-export const pinIcon = L.icon({
-  iconUrl: `data:image/svg+xml;base64,${btoa(PIN_SVG)}`,
-  iconSize: [26, 38],
-  iconAnchor: [13, 38],
-  popupAnchor: [0, -34],
-})
+/**
+ * The pin as a plain data URI plus its geometry, rather than a Leaflet icon
+ * object. PIN_ICON_ANCHOR is the pin's point — the tip that has to sit on the
+ * coordinate rather than beside it — stated next to the artwork that defines
+ * it so the marker does not inherit whatever anchoring a map library happens
+ * to default to.
+ */
+export const PIN_ICON_URL = `data:image/svg+xml;base64,${btoa(PIN_SVG)}`
+export const PIN_ICON_SIZE = { width: 26, height: 38 }
+export const PIN_ICON_ANCHOR = { x: 13, y: 38 }
 
 /**
  * D03 cluster scale — section 10.4.
@@ -34,16 +39,3 @@ export const CLUSTER_BANDS = [
   { band: 3, label: '10 – 19', fill: '#E76F51', ink: '#FFFFFF', size: 58 },
   { band: 4, label: '20 +', fill: '#B33F2B', ink: '#FFFFFF', size: 72 },
 ]
-
-export function clusterIcon(count, band) {
-  const spec = CLUSTER_BANDS.find((b) => b.band === band) ?? CLUSTER_BANDS[0]
-  return L.divIcon({
-    className: '',
-    html: `<div class="cluster" style="
-      width:${spec.size}px;height:${spec.size}px;
-      background:${spec.fill};color:${spec.ink};
-      font-size:${Math.round(spec.size * 0.34)}px;">${count}</div>`,
-    iconSize: [spec.size, spec.size],
-    iconAnchor: [spec.size / 2, spec.size / 2],
-  })
-}
