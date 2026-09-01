@@ -51,3 +51,9 @@ dashboard/dist/
 
 # dev.sh runtime logs
 .devlogs/
+
+# --- Claude Code local state ---
+# Agent worktrees are nested git checkouts; committing one would embed a repo
+# inside this one. Matches at any depth, unlike the root-anchored rule that was
+# sitting in .git/info/exclude, which is local-only and so shared with nobody.
+.claude/
