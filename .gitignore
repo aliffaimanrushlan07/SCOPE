@@ -57,3 +57,13 @@ dashboard/dist/
 # inside this one. Matches at any depth, unlike the root-anchored rule that was
 # sitting in .git/info/exclude, which is local-only and so shared with nobody.
 .claude/
+
+# --- Editors, logs, caches (from the initial GitHub setup) ---
+*.swp
+*.swo
+.env.*
+*.log
+logs/
+coverage/
+.cache/
+!.env.example
