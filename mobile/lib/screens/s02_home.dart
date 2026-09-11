@@ -140,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(4),
                     color: _carouselIndex == index
                         ? ScopeTheme.primary
-                        : const Color(0xFFCBD5D2),
+                        : ScopeTheme.line,
                   ),
                 ),
               ),

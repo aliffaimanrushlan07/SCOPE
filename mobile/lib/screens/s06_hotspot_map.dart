@@ -244,10 +244,16 @@ class _Legend extends StatelessWidget {
                     height: 10,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(5),
+                      // The section 10.4 band scale, matching the dashboard
+                      // ramp exactly. The mint-green start this replaced was
+                      // both off-scale and lighter than the band below it,
+                      // which broke the monotonic lightness the scale relies
+                      // on to stay readable without colour vision.
                       gradient: const LinearGradient(
                         colors: [
-                          Color(0xFF7FD4A8),
+                          Color(0xFFFFF1D1),
                           Color(0xFFFFD166),
+                          Color(0xFFF4A259),
                           Color(0xFFE76F51),
                           Color(0xFFB33F2B),
                         ],

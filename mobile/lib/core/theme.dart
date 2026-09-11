@@ -9,8 +9,18 @@ import 'package:flutter/material.dart';
 class ScopeTheme {
   ScopeTheme._();
 
-  static const Color primary = Color(0xFF00695C);
-  static const Color primaryDark = Color(0xFF003D33);
+  /// Brand blue. Identical to the dashboard's `--brand`, so a screenshot of
+  /// the app and a screenshot of the dashboard read as one system.
+  ///
+  /// Derived from the Jalur Gemilang blue (#010066) but held at ~70%
+  /// saturation: the flag value is meant for fabric, and at full saturation
+  /// it fringes badly behind white label text.
+  static const Color primary = Color(0xFF1A3D8F);
+
+  /// The same flag blue taken darker, used only for full-bleed chrome — the
+  /// splash here, the sidebar on the dashboard. Shared with `--chrome`.
+  static const Color chrome = Color(0xFF0B1F4D);
+
   static const Color danger = Color(0xFFB3261E);
   static const Color success = Color(0xFF2E7D32);
   static const Color warning = Color(0xFFE65100);
@@ -18,11 +28,23 @@ class ScopeTheme {
   static const Color ink = Color(0xFF17211F);
   static const Color inkMuted = Color(0xFF5A6663);
 
+  /// Hairlines. [line] separates controls, [lineSoft] separates a sheet's
+  /// action bar from its content.
+  static const Color line = Color(0xFFCBD5D2);
+  static const Color lineSoft = Color(0xFFE4E9E7);
+
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.light,
-    ).copyWith(surface: Colors.white, error: danger);
+    ).copyWith(
+      // Pinned: Material 3 otherwise renders a tonal approximation of the
+      // seed, so the button would not actually be the documented brand hex.
+      primary: primary,
+      onPrimary: Colors.white,
+      surface: Colors.white,
+      error: danger,
+    );
 
     return ThemeData(
       useMaterial3: true,
@@ -50,7 +72,7 @@ class ScopeTheme {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          side: const BorderSide(color: Color(0xFFCBD5D2)),
+          side: const BorderSide(color: line),
           foregroundColor: ink,
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),

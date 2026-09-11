@@ -105,7 +105,7 @@ class _PhotoReviewSheet extends StatelessWidget {
         MediaQuery.of(context).padding.bottom + Gap.md,
       ),
       decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFE4E9E7))),
+        border: Border(top: BorderSide(color: ScopeTheme.lineSoft)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

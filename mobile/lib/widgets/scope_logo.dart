@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme.dart';
-
-/// Placeholder brand mark.
+/// SCOPE brand mark: a camera aperture with a location pin punched out of its
+/// centre — the two things every report carries, photographic evidence and a
+/// GPS fix.
 ///
-/// Drawn rather than loaded from an asset so the app runs before any artwork
-/// exists. Replace with the real logo asset when it is ready; nothing else
-/// needs to change.
+/// [onDark] swaps to the knockout-white variant, whose negative space is
+/// transparent so the surface behind shows through it. Use it on
+/// [ScopeTheme.chrome]; the default colour mark is for light surfaces.
 class ScopeLogo extends StatelessWidget {
   const ScopeLogo({super.key, this.size = 40, this.onDark = false});
 
@@ -15,20 +15,15 @@ class ScopeLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colour = onDark ? Colors.white : ScopeTheme.primary;
-
-    return Container(
+    return Image.asset(
+      onDark
+          ? 'assets/branding/scope_mark_white.png'
+          : 'assets/branding/scope_mark.png',
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: colour, width: size * 0.07),
-      ),
-      child: Icon(
-        Icons.smoke_free_rounded,
-        size: size * 0.6,
-        color: colour,
-      ),
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      semanticLabel: 'SCOPE',
     );
   }
 }

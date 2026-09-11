@@ -265,7 +265,7 @@ class _LocationTaggingScreenState extends State<LocationTaggingScreen> {
       ),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE4E9E7))),
+        border: Border(top: BorderSide(color: ScopeTheme.lineSoft)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
