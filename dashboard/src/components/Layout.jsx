@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
+import scopeMarkWhite from '../assets/scope_mark_white.png'
 
 /**
  * Persistent shell across D02–D06.
@@ -29,7 +30,7 @@ export default function Layout() {
     <div className="shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span aria-hidden="true">⬡</span>
+          <img src={scopeMarkWhite} alt="" aria-hidden="true" width="22" height="22" />
           <span>SCOPE</span>
         </div>
 

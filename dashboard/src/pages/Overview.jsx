@@ -159,7 +159,9 @@ export default function Overview() {
                         right call for a report figure that gets screenshotted. */}
                     <Bar
                       dataKey="count"
-                      fill="#3d474c"
+                      /* --chart-bar. Inlined because recharts writes fill as
+                         an SVG attribute, which does not resolve var(). */
+                      fill="#3d68c9"
                       radius={[3, 3, 0, 0]}
                       isAnimationActive={false}
                       maxBarSize={64}

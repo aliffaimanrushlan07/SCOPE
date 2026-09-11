@@ -1,11 +1,29 @@
 /*
  * SCOPE administrative dashboard.
  *
- * Greyscale by design. The ONLY colour carrying meaning is the four-band
- * cluster scale on D03, so that colour reads unambiguously as "this encodes
- * magnitude" rather than decoration. Lightness decreases monotonically across
- * that scale, which is what keeps the map readable for colour-blind officers
- * and survives black-and-white printing of the report.
+ * Two colour zones, and the split is the whole rule.
+ *
+ * CHROME (sidebar) is deep teal-navy. It frames the work but never encodes
+ * anything, so an officer scanning the map for eight hours has a dark, quiet
+ * edge to rest against rather than a second field of white.
+ *
+ * The DATA REGION stays greyscale. The ONLY colour carrying meaning there is
+ * the four-band cluster scale on D03, so that colour still reads unambiguously
+ * as "this encodes magnitude" rather than decoration. Lightness decreases
+ * monotonically across that scale, which is what keeps the map readable for
+ * colour-blind officers and survives black-and-white printing of the report.
+ *
+ * Brand blue appears only on primary buttons, focus rings and the active nav
+ * item — never on a chart, never on the map.
+ *
+ * On the national palette: chrome and brand are derived from the Jalur
+ * Gemilang blue. The band scale below was NOT recoloured to match, because it
+ * already runs flag yellow to flag red — band 1 (#ffd166) sits 6° off
+ * #ffcc00 and band 4 (#b33f2b) 9° off #cc0001, at near-identical relative
+ * luminance. It arrived there from the colour-blind constraint, not from the
+ * flag, and it is left exactly as section 10.4 documents it. Flag yellow is
+ * therefore reserved to the data region and is deliberately absent from the
+ * chrome, so yellow never means two things on one screen.
  */
 
 :root {
@@ -18,11 +36,37 @@
   --surface-2: #eaeef0;
   --white: #ffffff;
 
-  /* Brand — used only for the active nav state and primary buttons */
-  --brand: #00695c;
-  --brand-dark: #004d40;
+  /* Brand — primary buttons, focus rings, active nav. Identical to the
+     mobile app's ScopeTheme.primary. Derived from the Jalur Gemilang blue
+     (#010066, hue 241°) held at hue 222° so it stays recognisably the flag
+     while dropping the saturation that makes the raw value unusable at size. */
+  --brand: #1a3d8f;
+  --brand-dark: #132e6e;
+
+  /* Chrome — the sidebar only. Identical to the app's ScopeTheme.chrome.
+     Same flag blue, taken darker for a full-height surface. Fully saturated
+     dark blue fringes at text edges over a long shift, so saturation sits at
+     ~75% rather than the flag's 100%.
+     Contrast on this ground: --chrome-ink 13.6:1, --chrome-muted 7.5:1,
+     --chrome-active 7.3:1. All clear WCAG AA; the first two clear AAA. */
+  --chrome: #0b1f4d;
+  --chrome-hover: rgba(255, 255, 255, 0.07);
+  --chrome-line: rgba(255, 255, 255, 0.13);
+  --chrome-ink: #e8edf7;
+  --chrome-muted: #a3b2d4;
+  --chrome-active: #8fb0ee;
 
   --danger: #b3261e;
+
+  /* Bar fill for the D02 time series. The brand hue two lightness steps up:
+     related to the brand, but far enough off the button colour (1.9:1) that
+     an inert bar does not read as something to click. Single-series, so hue
+     encodes nothing here — height already carries the whole magnitude. The
+     band scale below is deliberately NOT used: those hues mean density on
+     D03, and reusing them would claim a severity the count does not have.
+     Recharts sets fill as an SVG attribute, where var() does not resolve, so
+     the literal is repeated in Overview.jsx — keep the two in step. */
+  --chart-bar: #3d68c9;
 
   /* D03 cluster scale, section 10.4 */
   --band-1: #ffd166;
@@ -141,7 +185,7 @@ input, select {
 .field input:focus,
 .field select:focus {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(0, 105, 92, 0.12);
+  box-shadow: 0 0 0 3px rgba(26, 61, 143, 0.16);
 }
 
 .muted {
@@ -163,8 +207,8 @@ input, select {
 }
 
 .sidebar {
-  background: var(--white);
-  border-right: 1px solid var(--line);
+  background: var(--chrome);
+  color: var(--chrome-ink);
   display: flex;
   flex-direction: column;
   position: sticky;
@@ -178,9 +222,10 @@ input, select {
   gap: 10px;
   height: var(--topbar-h);
   padding: 0 18px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--chrome-line);
   font-weight: 700;
   letter-spacing: 1.5px;
+  color: var(--white);
 }
 
 .nav {
@@ -199,22 +244,43 @@ input, select {
   border-radius: 8px;
   font-size: 14px;
   font-weight: 550;
-  color: var(--ink-2);
+  color: var(--chrome-muted);
 }
 
 .nav a:hover {
-  background: var(--surface);
+  background: var(--chrome-hover);
+  color: var(--chrome-ink);
 }
 
+/* The active item is carried by weight and a left rule as well as colour, so
+   it is still identifiable without colour vision. */
 .nav a.active {
-  background: rgba(0, 105, 92, 0.1);
-  color: var(--brand-dark);
+  background: var(--chrome-hover);
+  color: var(--chrome-active);
+  font-weight: 650;
+  box-shadow: inset 2px 0 0 var(--chrome-active);
 }
 
 .sidebar-foot {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--chrome-line);
   padding: 14px;
   font-size: 13px;
+}
+
+.sidebar-foot .muted {
+  color: var(--chrome-muted);
+}
+
+/* Buttons sitting on the chrome need their own ground; the default .btn is
+   white-on-white there. */
+.sidebar-foot .btn {
+  background: var(--chrome-hover);
+  border-color: var(--chrome-line);
+  color: var(--chrome-ink);
+}
+
+.sidebar-foot .btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .topbar {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../components/AuthContext'
 import { errorMessage } from '../api/client'
+import scopeMark from '../assets/scope_mark.png'
 
 /** D01 — Admin Login (FR08). */
 export default function Login() {
@@ -55,7 +56,8 @@ export default function Login() {
             fontSize: 19,
           }}
         >
-          <span aria-hidden="true">⬡</span> SCOPE
+          <img src={scopeMark} alt="" aria-hidden="true" width="26" height="26" />
+          SCOPE
         </div>
 
         <h2 style={{ fontSize: 17, marginTop: 20 }}>Administrative Dashboard</h2>
