@@ -5,7 +5,7 @@ import { HeatmapLayer } from '@deck.gl/aggregation-layers'
 import * as api from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { ErrorState, Loading, TopBar } from '../components/ui'
-import { CLUSTER_BANDS } from '../components/leafletIcons'
+import { CLUSTER_BANDS } from '../components/clusterBands'
 
 const KUALA_LUMPUR = { lat: 3.139, lng: 101.6869 }
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID

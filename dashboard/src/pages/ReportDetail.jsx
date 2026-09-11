@@ -15,7 +15,7 @@ import {
   PIN_ICON_ANCHOR,
   PIN_ICON_SIZE,
   PIN_ICON_URL,
-} from '../components/leafletIcons'
+} from '../components/clusterBands'
 
 /**
  * D05 — Report Detail, READ-ONLY.
