@@ -1,25 +1,69 @@
-# macOS
-.DS_Store
+# --- Python / FastAPI ---
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
 
-# Editors and IDEs
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Environment files
+# --- Secrets ---
 .env
-.env.*
+*.env
 !.env.example
 
-# Logs
-*.log
-logs/
-
-# Common build and dependency outputs
+# --- Node / React ---
 node_modules/
 dist/
+.vite/
+
+# --- Flutter / Dart ---
+.dart_tool/
+.packages
 build/
+*.iml
+android/local.properties
+android/.gradle/
+android/key.properties
+ios/Pods/
+
+# --- ML: never commit the image corpus or model weights ---
+ml/data/
+ml/artifacts/
+*.h5
+*.keras
+*.tflite
+*.pb
+
+# --- Backend uploads ---
+backend/uploads/
+
+# --- macOS / editors ---
+.DS_Store
+.idea/
+.vscode/
+!.vscode/extensions.json
+
+# Flutter build output
+mobile/build/
+mobile/.flutter-plugins*
+
+# Dashboard build output
+dashboard/dist/
+
+# dev.sh runtime logs
+.devlogs/
+
+# --- Claude Code local state ---
+# Agent worktrees are nested git checkouts; committing one would embed a repo
+# inside this one. Matches at any depth, unlike the root-anchored rule that was
+# sitting in .git/info/exclude, which is local-only and so shared with nobody.
+.claude/
+
+# --- Editors, logs, caches (from the initial GitHub setup) ---
+*.swp
+*.swo
+.env.*
+*.log
+logs/
 coverage/
 .cache/
-
+!.env.example

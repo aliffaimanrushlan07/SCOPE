@@ -1,0 +1,2202 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SCOPE API",
+    "summary": "AI-Assisted Smoking Violation Reporting and Monitoring System",
+    "description": "Photographic evidence is classified **before** submission, so no unvalidated report ever reaches the database. Administrators hold read-only access: there is no endpoint anywhere in this API that verifies, approves, rejects or amends a filed report.",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/api/v1/classify": {
+      "post": {
+        "tags": [
+          "Reporting"
+        ],
+        "summary": "Validate photo evidence (S10)",
+        "operationId": "classify_api_v1_classify_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_classify_api_v1_classify_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassifyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports": {
+      "post": {
+        "tags": [
+          "Reporting"
+        ],
+        "summary": "Submit a report (S12 -> S13)",
+        "operationId": "create_report_api_v1_reports_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/device/{device_id}": {
+      "get": {
+        "tags": [
+          "Reporting"
+        ],
+        "summary": "Report History for one device (S14)",
+        "description": "Reports filed from this handset, newest first.\n\nA receipt log, not a tracker \u2014 no status is returned, because nothing in\nthe system can change a report after it is filed. History is bound to the\ndevice identifier and does not survive a reinstall; the app states this\nplainly rather than letting a user read it as a bug.",
+        "operationId": "report_history_api_v1_reports_device__device_id__get",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReportHistoryItem"
+                  },
+                  "title": "Response Report History Api V1 Reports Device  Device Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/{reference_no}": {
+      "get": {
+        "tags": [
+          "Reporting"
+        ],
+        "summary": "Read-only report detail (S14)",
+        "description": "Detail of one report.\n\n``device_id`` is required and must match the filing device. Without it, a\nguessed reference number would expose someone else's photographic evidence.",
+        "operationId": "report_detail_api_v1_reports__reference_no__get",
+        "parameters": [
+          {
+            "name": "reference_no",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Reference No"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/infographics": {
+      "get": {
+        "tags": [
+          "Public content"
+        ],
+        "summary": "The three awareness slots (S02 carousel, S04 hub)",
+        "operationId": "list_infographics_api_v1_infographics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InfographicOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Infographics Api V1 Infographics Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hotspots": {
+      "get": {
+        "tags": [
+          "Public content"
+        ],
+        "summary": "Public density heatmap (S06)",
+        "description": "Aggregated report density.\n\nReturns rounded coordinates with weights, never individual reports. The\npublic map shows where violations concentrate; it never attributes a report\nto a named premise. That is a deliberate decision protecting both reporter\nsafety and the system's defamation exposure, and it is why this endpoint\nexposes no reference number, premise name or timestamp.\n\nOfficers get full precision on D03 instead \u2014 precision for enforcement,\nprivacy for everyone else.",
+        "operationId": "hotspots_api_v1_hotspots_get",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 1,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HotspotPoint"
+                  },
+                  "title": "Response Hotspots Api V1 Hotspots Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/geo/search": {
+      "get": {
+        "tags": [
+          "Mapping"
+        ],
+        "summary": "Premise / place autocomplete (S11)",
+        "operationId": "search_places_api_v1_geo_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200,
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceSuggestion"
+                  },
+                  "title": "Response Search Places Api V1 Geo Search Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/geo/place/{place_id}": {
+      "get": {
+        "tags": [
+          "Mapping"
+        ],
+        "summary": "Resolve a search result to coordinates (S11)",
+        "description": "Turn an autocomplete suggestion into a taggable point.\n\nAutocomplete returns place identifiers, not coordinates, so selecting a\nsearch result needs this second call before the map pin can move.",
+        "operationId": "place_detail_api_v1_geo_place__place_id__get",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Place Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/geo/reverse": {
+      "get": {
+        "tags": [
+          "Mapping"
+        ],
+        "summary": "Reverse geocode the tagged pin (S11)",
+        "description": "Resolve coordinates to an address and a suggested premise name.\n\nThe premise name is only a suggestion \u2014 S11 pre-fills the field with it and\nthe reporter may edit or clear it. It is free text, not a category, and is\nnever used for aggregation.",
+        "operationId": "reverse_geocode_api_v1_geo_reverse_get",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 90,
+              "minimum": -90,
+              "title": "Lat"
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 180,
+              "minimum": -180,
+              "title": "Lng"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReverseGeocodeResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/login": {
+      "post": {
+        "tags": [
+          "Admin \u2014 Authentication"
+        ],
+        "summary": "Sign in (D01, FR08)",
+        "operationId": "login_api_v1_admin_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/logout": {
+      "post": {
+        "tags": [
+          "Admin \u2014 Authentication"
+        ],
+        "summary": "Sign out",
+        "operationId": "logout_api_v1_admin_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/me": {
+      "get": {
+        "tags": [
+          "Admin \u2014 Authentication"
+        ],
+        "summary": "Signed-in officer (sidebar)",
+        "operationId": "me_api_v1_admin_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/reports": {
+      "get": {
+        "tags": [
+          "Admin \u2014 Reports"
+        ],
+        "summary": "Report list (D04, FR10)",
+        "operationId": "list_reports_api_v1_admin_reports_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedReports"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/reports/export.csv": {
+      "get": {
+        "tags": [
+          "Admin \u2014 Reports"
+        ],
+        "summary": "CSV export (D04, FR13)",
+        "description": "Export the filtered set for patrol planning.\n\nThe export is logged with its filter criteria. This data leaves the system,\nso recording which officer took it and what they took is the PDPA Security\nPrinciple expectation.",
+        "operationId": "export_csv_api_v1_admin_reports_export_csv_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/reports/{report_id}": {
+      "get": {
+        "tags": [
+          "Admin \u2014 Reports"
+        ],
+        "summary": "Read-only report detail (D05, FR11)",
+        "operationId": "report_detail_api_v1_admin_reports__report_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/analytics/overview": {
+      "get": {
+        "tags": [
+          "Admin \u2014 Analytics"
+        ],
+        "summary": "Overview panels (D02)",
+        "operationId": "overview_api_v1_admin_analytics_overview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ],
+              "type": "string",
+              "default": "day",
+              "title": "Granularity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/hotspots/clusters": {
+      "get": {
+        "tags": [
+          "Admin \u2014 Analytics"
+        ],
+        "summary": "Hotspot clusters (D03, FR09)",
+        "description": "Report clusters at full officer-facing precision.\n\nNote the deliberate difference from the public heatmap at /api/v1/hotspots:\nadministrators get clusters resolvable to a location, the public gets\ndensity with no individual pins. Precision for enforcement, privacy for\neveryone else.",
+        "operationId": "clusters_api_v1_admin_hotspots_clusters_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 1,
+              "default": 365,
+              "title": "Days"
+            }
+          },
+          {
+            "name": "precision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 5,
+              "minimum": 2,
+              "default": 3,
+              "title": "Precision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClusterOut"
+                  },
+                  "title": "Response Clusters Api V1 Admin Hotspots Clusters Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/infographics": {
+      "get": {
+        "tags": [
+          "Admin \u2014 Infographics"
+        ],
+        "summary": "The three slots (D06)",
+        "operationId": "list_slots_api_v1_admin_infographics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InfographicOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Slots Api V1 Admin Infographics Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/infographics/{slot}": {
+      "put": {
+        "tags": [
+          "Admin \u2014 Infographics"
+        ],
+        "summary": "Replace a slot's image and title (D06)",
+        "operationId": "update_slot_api_v1_admin_infographics__slot__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 3,
+              "minimum": 1,
+              "description": "Fixed slot number; only 1, 2 or 3 exist.",
+              "title": "Slot"
+            },
+            "description": "Fixed slot number; only 1, 2 or 3 exist."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_update_slot_api_v1_admin_infographics__slot__put"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfographicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness probe",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminOut": {
+        "properties": {
+          "admin_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Admin Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "organisation": {
+            "type": "string",
+            "title": "Organisation"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "admin_id",
+          "email",
+          "full_name",
+          "organisation",
+          "role"
+        ],
+        "title": "AdminOut"
+      },
+      "AdminReportDetail": {
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Report Id"
+          },
+          "reference_no": {
+            "type": "string",
+            "title": "Reference No"
+          },
+          "reported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reported At"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "latitude": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Longitude"
+          },
+          "capture_latitude": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Latitude"
+          },
+          "capture_longitude": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Longitude"
+          },
+          "premise_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premise Name"
+          },
+          "address_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Text"
+          },
+          "reporter": {
+            "type": "string",
+            "title": "Reporter",
+            "default": "Anonymous"
+          },
+          "photos": {
+            "items": {
+              "$ref": "#/components/schemas/ReportPhotoOut"
+            },
+            "type": "array",
+            "title": "Photos"
+          },
+          "classification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClassificationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "location_integrity_metres": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Integrity Metres",
+            "description": "Distance between capture position and tagged position. A large divergence is worth an officer's attention."
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "reference_no",
+          "reported_at",
+          "submitted_at",
+          "latitude",
+          "longitude",
+          "capture_latitude",
+          "capture_longitude",
+          "premise_name",
+          "address_text",
+          "photos",
+          "classification"
+        ],
+        "title": "AdminReportDetail"
+      },
+      "AdminReportRow": {
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Report Id"
+          },
+          "reference_no": {
+            "type": "string",
+            "title": "Reference No"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "premise_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premise Name"
+          },
+          "address_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Text"
+          },
+          "ai_confidence": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Ai Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "reference_no",
+          "submitted_at",
+          "premise_name",
+          "address_text",
+          "ai_confidence"
+        ],
+        "title": "AdminReportRow",
+        "description": "A D04 table row. Five columns, no status, no premise type."
+      },
+      "Body_classify_api_v1_classify_post": {
+        "properties": {
+          "photos": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Photos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "photos"
+        ],
+        "title": "Body_classify_api_v1_classify_post"
+      },
+      "Body_update_slot_api_v1_admin_infographics__slot__put": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "Body_update_slot_api_v1_admin_infographics__slot__put"
+      },
+      "ClassificationOut": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "threshold_used": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Threshold Used"
+          },
+          "highest_confidence": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Highest Confidence"
+          },
+          "photos_evaluated": {
+            "type": "integer",
+            "title": "Photos Evaluated"
+          },
+          "photos_passed": {
+            "type": "integer",
+            "title": "Photos Passed"
+          },
+          "evaluated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Evaluated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "model_version",
+          "threshold_used",
+          "highest_confidence",
+          "photos_evaluated",
+          "photos_passed",
+          "evaluated_at"
+        ],
+        "title": "ClassificationOut",
+        "description": "D05 AI panel. Display only \u2014 provenance, not a control."
+      },
+      "ClassifyResponse": {
+        "properties": {
+          "validation_token": {
+            "type": "string",
+            "title": "Validation Token",
+            "description": "Opaque handle to the server's record of this classification. Present it to POST /reports; it is single-use."
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "description": "PASS when at least one photo cleared the threshold."
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "threshold_used": {
+            "type": "number",
+            "title": "Threshold Used"
+          },
+          "highest_confidence": {
+            "type": "number",
+            "title": "Highest Confidence"
+          },
+          "photos_evaluated": {
+            "type": "integer",
+            "title": "Photos Evaluated"
+          },
+          "photos_passed": {
+            "type": "integer",
+            "title": "Photos Passed"
+          },
+          "evaluated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Evaluated At"
+          },
+          "photos": {
+            "items": {
+              "$ref": "#/components/schemas/PhotoVerdict"
+            },
+            "type": "array",
+            "title": "Photos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "validation_token",
+          "outcome",
+          "model_version",
+          "threshold_used",
+          "highest_confidence",
+          "photos_evaluated",
+          "photos_passed",
+          "evaluated_at",
+          "photos"
+        ],
+        "title": "ClassifyResponse"
+      },
+      "ClusterOut": {
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "band": {
+            "type": "integer",
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Band"
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude",
+          "count",
+          "band"
+        ],
+        "title": "ClusterOut",
+        "description": "A D03 cluster, resolvable to a location \u2014 unlike the public heatmap.\n\n``band`` indexes the four-step scale in section 10.4, which encodes count\nthree ways at once (size, colour, numeral) so the map survives colour-blind\nviewing and black-and-white printing."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HotspotPoint": {
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "weight": {
+            "type": "integer",
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude",
+          "weight"
+        ],
+        "title": "HotspotPoint",
+        "description": "One weighted point of the public density heatmap.\n\nCoordinates are ROUNDED before they leave the server. The public map shows\nwhere violations concentrate, never which premise was reported \u2014 that\ndistinction protects both reporter safety and the system's defamation\nexposure. Full precision is available only to authenticated officers on D03."
+      },
+      "InfographicOut": {
+        "properties": {
+          "infographic_id": {
+            "type": "integer",
+            "title": "Infographic Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "image_path": {
+            "type": "string",
+            "title": "Image Path"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "infographic_id",
+          "title",
+          "image_path",
+          "updated_at"
+        ],
+        "title": "InfographicOut"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "LoginResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In",
+            "description": "Seconds. D01 discloses a 30-minute timeout."
+          },
+          "admin": {
+            "$ref": "#/components/schemas/AdminOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_in",
+          "admin"
+        ],
+        "title": "LoginResponse"
+      },
+      "OverviewResponse": {
+        "properties": {
+          "total_reports": {
+            "type": "integer",
+            "title": "Total Reports"
+          },
+          "period_total": {
+            "type": "integer",
+            "title": "Period Total"
+          },
+          "previous_period_total": {
+            "type": "integer",
+            "title": "Previous Period Total"
+          },
+          "percentage_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentage Change"
+          },
+          "reports_over_time": {
+            "items": {
+              "$ref": "#/components/schemas/TimeSeriesPoint"
+            },
+            "type": "array",
+            "title": "Reports Over Time"
+          },
+          "top_locations": {
+            "items": {
+              "$ref": "#/components/schemas/TopLocation"
+            },
+            "type": "array",
+            "title": "Top Locations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_reports",
+          "period_total",
+          "previous_period_total",
+          "percentage_change",
+          "reports_over_time",
+          "top_locations"
+        ],
+        "title": "OverviewResponse",
+        "description": "D02 panels.\n\nDeliberately absent: average AI confidence, pending-review count, verified\ncount. All three described a verification workflow that no longer exists."
+      },
+      "PaginatedReports": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminReportRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "PaginatedReports"
+      },
+      "PhotoVerdict": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "filename",
+          "confidence",
+          "passed"
+        ],
+        "title": "PhotoVerdict"
+      },
+      "PlaceDetail": {
+        "properties": {
+          "place_id": {
+            "type": "string",
+            "title": "Place Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          }
+        },
+        "type": "object",
+        "required": [
+          "place_id",
+          "name",
+          "address",
+          "latitude",
+          "longitude"
+        ],
+        "title": "PlaceDetail",
+        "description": "A search result resolved to a taggable point (S11)."
+      },
+      "PlaceSuggestion": {
+        "properties": {
+          "place_id": {
+            "type": "string",
+            "title": "Place Id"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "main_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Text"
+          },
+          "secondary_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "place_id",
+          "description"
+        ],
+        "title": "PlaceSuggestion"
+      },
+      "ReportCreate": {
+        "properties": {
+          "validation_token": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 32,
+            "title": "Validation Token"
+          },
+          "device_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Device Id"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "premise_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premise Name"
+          },
+          "address_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Text"
+          },
+          "capture_latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Latitude"
+          },
+          "capture_longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Longitude"
+          },
+          "reported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reported At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "validation_token",
+          "device_id",
+          "latitude",
+          "longitude",
+          "reported_at"
+        ],
+        "title": "ReportCreate"
+      },
+      "ReportCreateResponse": {
+        "properties": {
+          "reference_no": {
+            "type": "string",
+            "title": "Reference No"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "photos_stored": {
+            "type": "integer",
+            "title": "Photos Stored"
+          },
+          "duplicate_submission": {
+            "type": "boolean",
+            "title": "Duplicate Submission",
+            "description": "True when this token had already been submitted; the original reference number is returned rather than a second report filed.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference_no",
+          "submitted_at",
+          "photos_stored"
+        ],
+        "title": "ReportCreateResponse"
+      },
+      "ReportDetail": {
+        "properties": {
+          "reference_no": {
+            "type": "string",
+            "title": "Reference No"
+          },
+          "premise_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premise Name"
+          },
+          "address_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Text"
+          },
+          "reported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reported At"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "photo_count": {
+            "type": "integer",
+            "title": "Photo Count"
+          },
+          "thumbnail_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Path"
+          },
+          "latitude": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Longitude"
+          },
+          "photos": {
+            "items": {
+              "$ref": "#/components/schemas/ReportPhotoOut"
+            },
+            "type": "array",
+            "title": "Photos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference_no",
+          "premise_name",
+          "address_text",
+          "reported_at",
+          "submitted_at",
+          "photo_count",
+          "thumbnail_path",
+          "latitude",
+          "longitude",
+          "photos"
+        ],
+        "title": "ReportDetail"
+      },
+      "ReportHistoryItem": {
+        "properties": {
+          "reference_no": {
+            "type": "string",
+            "title": "Reference No"
+          },
+          "premise_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premise Name"
+          },
+          "address_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Text"
+          },
+          "reported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reported At"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "photo_count": {
+            "type": "integer",
+            "title": "Photo Count"
+          },
+          "thumbnail_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference_no",
+          "premise_name",
+          "address_text",
+          "reported_at",
+          "submitted_at",
+          "photo_count",
+          "thumbnail_path"
+        ],
+        "title": "ReportHistoryItem",
+        "description": "One row of Report History.\n\nCarries no status field. Because evidence is validated before submission\nand administrators are read-only, nothing can change a report's state after\nfiling; a status would advertise a workflow that does not exist."
+      },
+      "ReportPhotoOut": {
+        "properties": {
+          "sequence_no": {
+            "type": "integer",
+            "title": "Sequence No"
+          },
+          "storage_path": {
+            "type": "string",
+            "title": "Storage Path"
+          },
+          "confidence_score": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Confidence Score"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sequence_no",
+          "storage_path",
+          "confidence_score",
+          "captured_at"
+        ],
+        "title": "ReportPhotoOut"
+      },
+      "ReverseGeocodeResult": {
+        "properties": {
+          "address_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Text"
+          },
+          "premise_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premise Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "address_text",
+          "premise_name"
+        ],
+        "title": "ReverseGeocodeResult"
+      },
+      "TimeSeriesPoint": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "count"
+        ],
+        "title": "TimeSeriesPoint"
+      },
+      "TopLocation": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "count",
+          "latitude",
+          "longitude"
+        ],
+        "title": "TopLocation"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
