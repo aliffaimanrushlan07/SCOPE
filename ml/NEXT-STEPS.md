@@ -67,61 +67,73 @@ than a higher number obtained the current way.
 
 ---
 
-## 2. Augmentation is the weakest part of training
+## 2. Augmentation is the weakest part of training — IMPLEMENTED, RUN OUTSTANDING
 
-Current augmentation (notebook cell 8) is horizontal flip plus brightness,
-contrast and saturation jitter. That is a light CNN-era recipe, and Vision
-Transformers are known to need more on datasets of this size — 1,358 training
-images is small for a ViT-Base.
+The old recipe was horizontal flip plus brightness/contrast/saturation jitter:
+a light CNN-era pipeline for a ViT-Base on 1,358 images, and one that did not
+rehearse the domain gap the README names — real submissions are **further
+away, more motion-blurred and worse lit** than web-sourced photographs.
 
-It also does not rehearse the domain gap the README names honestly: real
-submissions will be **further away, more motion-blurred and worse lit** than
-web-sourced photographs. The augmentation should simulate exactly that.
+Notebook cell 8 now implements, in `tf.image`:
 
-Add, in rough order of value:
-
-| Technique | Why here | Source |
+| Technique | Why here | State |
 |---|---|---|
-| RandomResizedCrop (scale 0.6–1.0) | Rehearses subject distance — the main domain gap | standard ViT recipe |
-| Motion blur, Gaussian blur, JPEG compression, downscale | Rehearses phone-camera conditions; also makes the "too blurry" band meaningful | [albumentations](https://github.com/albumentations-team/albumentations) |
-| RandAugment | Standard ViT policy; replaces the hand-rolled jitter | [DeiT](https://github.com/facebookresearch/deit), arXiv:2012.12877 |
-| Mixup + CutMix | The DeiT recipe's main defence against ViT overfitting on small data | same |
-| Random Erasing | Occlusion robustness (hands, phones, crowds) | same |
+| RandomResizedCrop, scale 0.6–1.0 | Rehearses subject distance — the main domain gap | done |
+| Random horizontal flip | Kept from the old recipe | done |
+| RandAugment-style policy, N=2 ops | Replaces three hand-tuned constants with a sampled policy | done |
+| Gaussian blur, motion blur, downscale, JPEG | Rehearses phone-camera conditions | done |
+| Random erasing | Occlusion robustness (hands, phones, crowds) | done |
+| Mixup + CutMix | The other half of the DeiT recipe | **not done — see below** |
 
-`keras_cv.layers` provides `RandAugment`, `MixUp`, `CutMix` and
-`RandomCutout` as Keras layers, so this stays inside the TensorFlow stack that
-Table 3.5 commits to. No PyTorch needed.
+Two deliberate departures from the plan as first written:
 
-Note: Mixup and CutMix produce soft labels, so the loss must move from
-`SparseCategoricalCrossentropy` to `CategoricalCrossentropy` with one-hot
-labels.
+**Hand-rolled `tf.image`, not `keras_cv`.** keras-cv is in maintenance and its
+co-install with Keras 3 and keras-hub is fragile on Colab; a broken import at
+the top of a training run costs more than the citation is worth. The policy is
+therefore *RandAugment-style* — N ops sampled at a shared magnitude — and not
+the published op list, which the report should say. Cite arXiv:1909.13719 for
+the method, not for this implementation.
+
+**Mixup and CutMix are still outstanding.** They produce soft labels that
+interact with the label smoothing added in §3, and their effect is worth
+measuring on its own row of the results table rather than bundled in with
+everything else here.
+
+The crop takes its region from the image as stored (long side 256), not from a
+pre-resized 224 copy, so it keeps detail a pre-resize would have discarded.
+
+**What is left is the retrain**, and a row in the results table comparing
+precision and recall before and after.
 
 ---
 
-## 3. Training is not measuring the thing being optimised
+## 3. Training is not measuring the thing being optimised — IMPLEMENTED, RUN OUTSTANDING
 
-`metrics=['accuracy']` and `EarlyStopping(monitor='val_loss')`. Neither is
-precision. The retained checkpoint is therefore the one with the best loss,
-not the one that would serve S10 best.
+`metrics=['accuracy']` and `EarlyStopping(monitor='val_loss')` meant the
+retained checkpoint was the one with the best loss, not the one that serves S10
+best. Cell 10 now compiles with precision, recall and PR-AUC, and both training
+stages early-stop on `val_pr_auc` with `mode='max'`.
 
-```python
-metrics=[
-    'accuracy',
-    keras.metrics.Precision(name='precision'),
-    keras.metrics.Recall(name='recall'),
-    keras.metrics.AUC(name='pr_auc', curve='PR'),
-]
-...
-keras.callbacks.EarlyStopping(monitor='val_pr_auc', mode='max',
-                              patience=3, restore_best_weights=True)
-```
+Two things that are easy to get wrong here, and are handled:
 
-PR-AUC rather than precision-at-0.5, because it is threshold-independent and
-so does not fight the threshold selection in §1.
+**The metrics read the positive-class column.** `keras.metrics.Precision` on a
+2-column softmax compares the whole output against the whole target, averaging
+the positive class with its own complement. On a worked example that reports
+0.600 where the real positive-class precision is 0.667. The notebook therefore
+wraps Precision, Recall and AUC to slice `[:, POSITIVE_INDEX]` first.
 
-Add label smoothing at the same time — `label_smoothing=0.1`. The score
-distribution (mean 0.939 for smoking, 0.055 for not) is very hard, which is
-exactly the over-confidence label smoothing exists to temper.
+**`mode='max'` is not optional.** With the default `mode='auto'` on an
+unrecognised metric name, Keras can minimise PR-AUC and restore the worst
+weights of the run.
+
+Label smoothing (`label_smoothing=0.1`) went in at the same time. It forced the
+loss from `SparseCategoricalCrossentropy` to `CategoricalCrossentropy` and the
+labels to one-hot, since Keras implements smoothing only on the latter — the
+same change Mixup would have needed. Smoothing is applied inside the loss, so
+the metrics still see clean 0/1 targets.
+
+PR-AUC rather than precision-at-0.5, because it is threshold-independent and so
+does not fight the threshold selection in §1.
 
 ---
 
@@ -172,11 +184,18 @@ makes `REPORT_PHOTO.confidence_score` mean what it appears to mean.
 
 1. Re-tune the threshold on validation, re-report on test. **(§1 — tooling
    done, needs a run against a trained model)**
-2. Add precision/recall/PR-AUC metrics and PR-AUC early stopping. **(§3)**
-3. Add the stronger augmentation pipeline and label smoothing. **(§2, §3)**
+2. Add precision/recall/PR-AUC metrics and PR-AUC early stopping. **(§3 —
+   implemented, needs a run)**
+3. Add the stronger augmentation pipeline and label smoothing. **(§2, §3 —
+   implemented, needs a run)**
 4. Retrain across 3 seeds; report mean ± SD. **(§4)**
 5. Calibrate. **(§5)**
 6. TTA and the ≥2-photo analysis. **(§6)**
+
+Everything from §1 to §3 is now implemented but unmeasured: the next Colab run
+is what turns it into evidence. Export that model as **`vit-scope-v2`** and
+bump `AI_MODEL_VERSION` — `vit-scope-v1`'s scores were produced by a different
+recipe, and `AI_CLASSIFICATION.model_version` is what keeps them apart.
 
 Keep a results table from step 1, one row per change, precision and recall
 before and after. That table is the answer to "what techniques did you add" —

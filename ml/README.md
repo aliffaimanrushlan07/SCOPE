@@ -34,13 +34,22 @@ validated on 290, and evaluated **once** on 293 held-out test images.
 Mean score for smoking images **0.939**, for non-smoking **0.055** — a
 separation of 0.884, meaning the model is decisive rather than hedging.
 
-> **These figures are optimistically biased and will change.** The 0.70
-> threshold was selected by sweeping these same test scores, so the operating
-> point was fitted to the images the result is claimed on. The tooling for the
-> correct procedure — select on validation, report on test — is in place
-> (`score_split.py`, and `select_threshold.py --at-threshold`); the numbers
-> above are re-measured the next time the model is trained. Expect precision to
-> fall slightly. That is the honest figure, not a regression.
+> **These figures are from `vit-scope-v1` and will change.** Two reasons.
+>
+> The 0.70 threshold was selected by sweeping these same test scores, so the
+> operating point was fitted to the images the result is claimed on. The
+> tooling for the correct procedure — select on validation, report on test — is
+> in place (`score_split.py`, and `select_threshold.py --at-threshold`).
+>
+> The training recipe has also changed since this run: stronger augmentation,
+> precision/recall/PR-AUC metrics, PR-AUC early stopping and label smoothing
+> (step 4 below). `vit-scope-v1` predates all of it.
+>
+> The next run trains under the new recipe and re-measures under the correct
+> procedure. **Export it as `vit-scope-v2`** and bump `AI_MODEL_VERSION`, so
+> `AI_CLASSIFICATION.model_version` keeps historical confidence scores
+> interpretable. Expect precision to fall slightly once the threshold is chosen
+> on validation. That is the honest figure, not a regression.
 
 ### Threshold sweep
 
@@ -155,6 +164,26 @@ and reproducible; splitting happens before augmentation.
 
 Two stages: freeze the backbone and train the head, then unfreeze and
 fine-tune at a lower learning rate.
+
+**Augmentation** (training split only, `tf.image`, no extra dependency):
+RandomResizedCrop at scale 0.6–1.0, horizontal flip, a RandAugment-style
+policy of two sampled colour operations, then at most one phone-camera
+degradation (Gaussian blur, motion blur, downscale, or JPEG re-encoding at
+quality 30–75), then random erasing. A ViT-Base overfits 1,358 images through a
+light recipe — this is the DeiT argument (arXiv:2012.12877) — and the crop and
+degradations rehearse the domain gap named under *Limitations* below. Mixup and
+CutMix are not included; they are worth measuring separately.
+
+**What training measures.** Precision, recall and PR-AUC on the positive class,
+with both stages early-stopping on `val_pr_auc` (`mode='max'`). Accuracy and
+`val_loss` kept whichever checkpoint had the lowest loss, which on a
+precision-critical task is not the one worth keeping. PR-AUC is
+threshold-independent, so it does not fight the threshold selection in step 5.
+
+Labels are **one-hot** and the loss is `CategoricalCrossentropy(label_smoothing=0.1)`:
+Keras implements smoothing only there, and the current score distribution
+(0.939 against 0.055) is exactly the over-confidence it tempers. Smoothing is
+applied inside the loss, so the reported metrics still see clean 0/1 targets.
 
 > **`activation='softmax'` is required and is not the default.** KerasHub ships
 > `activation=None`, which returns raw logits. Pairing that with
