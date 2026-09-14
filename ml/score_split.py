@@ -45,9 +45,32 @@ ML_DIR = Path(__file__).resolve().parent
 ROOT = ML_DIR.parent
 MANIFEST = ML_DIR / "data" / "manifest.csv"
 ARTIFACTS = ML_DIR / "artifacts"
-DEFAULT_MODEL = ARTIFACTS / "vit-scope-v1.keras"
 
 BATCH_SIZE = 16
+
+
+def default_model() -> Path:
+    """The single model in ml/artifacts/, or an error naming the choices.
+
+    Not a hardcoded filename: every retrain gets a new MODEL_VERSION, so a
+    fixed default silently scores the PREVIOUS model the first time someone
+    trains a new one — and the scores look perfectly reasonable.
+    """
+    found = sorted(ARTIFACTS.glob("*.keras"))
+
+    if not found:
+        sys.exit(
+            f"No .keras model in {ARTIFACTS}\n"
+            "Train one with ml/notebooks/finetune_vit.ipynb and put the "
+            "downloaded file there, or pass --model."
+        )
+    if len(found) > 1:
+        names = "\n".join(f"  --model ml/artifacts/{m.name}" for m in found)
+        sys.exit(
+            f"{len(found)} models in {ARTIFACTS}. Say which one:\n{names}"
+        )
+
+    return found[0]
 
 
 def load_manifest_rows(split: str) -> list[dict[str, str]]:
@@ -140,12 +163,14 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("split", choices=("val", "test", "train"))
-    parser.add_argument("--model", type=Path, default=DEFAULT_MODEL,
-                        help=f"Model to score with (default: {DEFAULT_MODEL})")
+    parser.add_argument("--model", type=Path, default=None,
+                        help="Model to score with (default: the only .keras "
+                             "in ml/artifacts/)")
     args = parser.parse_args()
 
     rows = load_manifest_rows(args.split)
-    inference = import_backend(args.model.resolve())
+    model = (args.model or default_model()).resolve()
+    inference = import_backend(model)
 
     positives = sum(1 for r in rows if r["label"] == "smoking")
     print(f"Scoring the {args.split} split: {len(rows)} images "
