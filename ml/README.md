@@ -13,7 +13,7 @@ threshold and accepts the report when at least one photograph clears it.
 | Tooling (`prepare_dataset.py`, `select_threshold.py`, notebook) | ✅ |
 | Dataset assembled and split | ✅ 1,941 images |
 | Model fine-tuned | ✅ `vit-scope-v1` |
-| Threshold chosen | ✅ **0.70** |
+| Threshold chosen | ⚠️ **0.70**, but selected on the test split — [re-select on validation](#5-threshold) |
 | Wired into the backend | ✅ real inference, stub removed |
 
 ---
@@ -33,6 +33,14 @@ validated on 290, and evaluated **once** on 293 held-out test images.
 
 Mean score for smoking images **0.939**, for non-smoking **0.055** — a
 separation of 0.884, meaning the model is decisive rather than hedging.
+
+> **These figures are optimistically biased and will change.** The 0.70
+> threshold was selected by sweeping these same test scores, so the operating
+> point was fitted to the images the result is claimed on. The tooling for the
+> correct procedure — select on validation, report on test — is in place
+> (`score_split.py`, and `select_threshold.py --at-threshold`); the numbers
+> above are re-measured the next time the model is trained. Expect precision to
+> fall slightly. That is the honest figure, not a regression.
 
 ### Threshold sweep
 
@@ -162,14 +170,33 @@ and no PyTorch is involved.
 
 ### 5. Threshold
 
+Two steps, in this order. They are not interchangeable.
+
 ```bash
-./backend/.venv/bin/python ml/select_threshold.py ml/artifacts/test_scores_backend.csv
+# SELECT on validation — this is where the operating point is chosen
+./backend/.venv/bin/python ml/score_split.py val
+./backend/.venv/bin/python ml/select_threshold.py ml/artifacts/val_scores_backend.csv
+
+# REPORT on test at the threshold that came back, changing nothing
+./backend/.venv/bin/python ml/score_split.py test
+./backend/.venv/bin/python ml/select_threshold.py \
+    ml/artifacts/test_scores_backend.csv --at-threshold <frozen>
 ```
 
-Scores were recomputed **through the backend's own inference code**, not taken
-from the notebook. Resizing with PIL instead of TensorFlow shifted individual
-scores by up to **0.46**, which would have silently invalidated the
-calibration.
+The threshold is a parameter fitted to data, like a weight. Fitting it on the
+test split and then reporting test metrics at that point measures the model on
+images the operating point was chosen to suit — the precision that comes back
+is an upper bound on itself rather than an independent estimate. Sweeping a
+file whose name contains `test` now prints a warning for exactly this reason.
+
+If the threshold is adjusted after seeing the test figures, the test split has
+been spent and the number is no longer independent. Change the model instead,
+or state plainly in Chapter 5 that the split was reused.
+
+Scores are recomputed **through the backend's own inference code** — the
+`score_images` entry point that serves S10 — not taken from the notebook.
+Resizing with PIL instead of TensorFlow shifted individual scores by up to
+**0.46**, which would have silently invalidated the calibration.
 
 ### 6. Backend
 
@@ -209,6 +236,11 @@ party.
 averaged over repeated runs with different seeds, so they carry the variance of
 a single training run.
 
+**The published threshold was selected on the test split.** Until the model is
+retrained and the validation-first procedure in section 5 is run end to end,
+the reported precision of 0.977 is an upper bound on itself. The procedure is
+implemented; the figures are not yet re-measured under it.
+
 ---
 
 ## Files
@@ -217,9 +249,11 @@ a single training run.
 |---|---|
 | `prepare_dataset.py` | De-duplicate, split, manifest |
 | `make_colab_bundle.py` | Resize + zip for upload |
-| `select_threshold.py` | Threshold sweep and recommendation |
+| `score_split.py` | Score a split through the backend's inference code |
+| `select_threshold.py` | Threshold selection (val) and reporting (test) |
 | `notebooks/finetune_vit.ipynb` | Training |
 | `data/manifest.csv` | The authoritative split (gitignored) |
 | `data/report.md` | Composition table for Chapter 5 |
 | `artifacts/vit-scope-v1.keras` | Trained model, ~982 MB (gitignored) |
-| `artifacts/test_scores_backend.csv` | Scores used to pick the threshold |
+| `artifacts/val_scores_backend.csv` | Scores the threshold is SELECTED on |
+| `artifacts/test_scores_backend.csv` | Scores the threshold is REPORTED on |

@@ -1,12 +1,33 @@
 """Choose the confidence threshold from evaluation results.
 
-    python ml/select_threshold.py ml/artifacts/test_scores.csv
+    # 1. select on VALIDATION
+    python ml/select_threshold.py ml/artifacts/val_scores_backend.csv
+
+    # 2. report on TEST at the threshold that came back, without re-selecting
+    python ml/select_threshold.py ml/artifacts/test_scores_backend.csv \
+        --at-threshold 0.70
 
 Input CSV needs two columns:
     label   — "smoking" or "notsmoking" (the ground truth)
     score   — the model's P(smoking), 0.0 to 1.0
 
-The training notebook writes this file for the held-out TEST split.
+`ml/score_split.py` writes these files, for any split, through the backend's
+own inference code.
+
+SELECT ON VALIDATION, REPORT ON TEST
+------------------------------------
+The threshold is a parameter fitted to data, exactly like a weight. Fitting it
+on the test split and then reporting test metrics at that point measures the
+model on images the operating point was chosen to suit: the resulting precision
+is an upper bound on itself, not an independent estimate.
+
+So this script defaults to the VALIDATION scores, and the sweep is the
+selection step. Once a threshold is chosen it is frozen; test metrics are then
+reported with --at-threshold, which prints one row and offers no choice. The
+default and the two modes exist to make the correct order the easy one.
+
+A number that falls when this discipline is applied has not regressed — the
+previous number was measured wrongly. Report the lower one, and say why.
 
 WHY THIS IS A SCRIPT AND NOT A GUESS
 ------------------------------------
@@ -52,7 +73,9 @@ def load_scores(path: Path) -> list[tuple[int, float]]:
     if not path.exists():
         sys.exit(
             f"No scores file at {path}\n"
-            "Run the evaluation cell in ml/notebooks/finetune_vit.ipynb first."
+            "Produce it first, through the backend's own inference code:\n"
+            f"  ./backend/.venv/bin/python ml/score_split.py "
+            f"{'test' if 'test' in path.name else 'val'}"
         )
 
     rows: list[tuple[int, float]] = []
@@ -141,21 +164,91 @@ def choose(
     return best_recall, best_f1
 
 
+def warn_if_test_split(path: Path) -> None:
+    """Refuse to quietly select a threshold on a file that looks like test.
+
+    This is the mistake the split discipline in the module docstring exists to
+    prevent, and it is invisible in the output once made: the sweep prints a
+    perfectly ordinary table either way.
+    """
+    if "test" not in path.name.lower():
+        return
+
+    print("!" * 62)
+    print("  These look like TEST scores, and this is the SELECTION mode.")
+    print()
+    print("  Choosing the operating point here and then reporting test")
+    print("  metrics at it fits the threshold to the images the result is")
+    print("  claimed on. Select on validation instead:")
+    print()
+    print("    python ml/score_split.py val")
+    print("    python ml/select_threshold.py ml/artifacts/val_scores_backend.csv")
+    print()
+    print("  To report test metrics at an already-frozen threshold, pass")
+    print("  --at-threshold <value> instead of sweeping.")
+    print("!" * 62)
+    print()
+
+
+def report_at(rows: list[tuple[int, float]], threshold: float) -> int:
+    """Print the metrics at a threshold chosen elsewhere. No selection here."""
+    if not 0.0 < threshold < 1.0:
+        sys.exit(f"--at-threshold must be between 0 and 1, got {threshold}.")
+
+    m = metrics_at(rows, threshold)
+
+    print("=" * 62)
+    print(f"  METRICS AT THE FROZEN THRESHOLD: {threshold:.4f}")
+    print("=" * 62)
+    print(f"  Precision {m['precision']:.3f}")
+    print(f"  Recall    {m['recall']:.3f}")
+    print(f"  F1        {m['f1']:.3f}")
+    print(f"  Accuracy  {m['accuracy']:.3f}")
+    print(f"  Confusion  TP {m['tp']}  FP {m['fp']}  "
+          f"FN {m['fn']}  TN {m['tn']}")
+    print()
+    print("Report it as a sentence, with the threshold and the split named:")
+    print(f"  \"At a threshold of {threshold:.2f}, selected on the validation")
+    print(f"  split, the classifier reached precision {m['precision']:.3f} and "
+          f"recall {m['recall']:.3f}")
+    print(f"  on the held-out test split ({len(rows)} images).\"")
+    print()
+    print("Do not tune the threshold against these numbers. If it is changed "
+          "after seeing them,")
+    print("the test split has been spent and the figure is no longer "
+          "independent.")
+
+    return 0
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("scores", type=Path, nargs="?",
-                        default=Path("ml/artifacts/test_scores.csv"))
+                        default=Path("ml/artifacts/val_scores_backend.csv"))
     parser.add_argument("--target-precision", type=float,
                         default=DEFAULT_TARGET_PRECISION)
+    parser.add_argument("--at-threshold", type=float, default=None,
+                        help="Report metrics at this frozen threshold instead "
+                             "of selecting one. Use on the test split, with "
+                             "the value chosen on validation.")
     args = parser.parse_args()
 
     rows = load_scores(args.scores)
-    results = sweep(rows)
-    chosen, best_f1 = choose(results, args.target_precision)
 
     positives = sum(y for y, _ in rows)
-    print(f"Test set: {len(rows)} images "
+    print(f"{args.scores.name}: {len(rows)} images "
           f"({positives} smoking, {len(rows) - positives} not smoking)\n")
+
+    if args.at_threshold is not None:
+        return report_at(rows, args.at_threshold)
+
+    warn_if_test_split(args.scores)
+
+    results = sweep(rows)
+    chosen, best_f1 = choose(results, args.target_precision)
 
     print("Threshold sweep")
     print(f"{'thresh':>7} {'prec':>7} {'recall':>7} {'F1':>7} "
@@ -203,6 +296,11 @@ def main() -> int:
     print()
     print("The threshold is read per request, so it can be retuned later "
           "without rebuilding the mobile app — which is what §S10 requires.")
+    print()
+    print("This threshold is now FROZEN. Report on the test split at it:")
+    print("  python ml/score_split.py test")
+    print(f"  python ml/select_threshold.py ml/artifacts/test_scores_backend.csv "
+          f"--at-threshold {chosen['threshold']:.4f}")
 
     return 0
 

@@ -27,32 +27,43 @@ Any plan that proposes these is proposing work that is finished.
 
 ---
 
-## 1. The threshold is tuned on the test set — fix this first
+## 1. The threshold is tuned on the test set — TOOLING DONE, RUN OUTSTANDING
 
-`select_threshold.py` defaults to `artifacts/test_scores.csv`, and the chosen
-0.70 came from `test_scores_backend.csv`. Both are the **held-out test split**.
-
-Selecting the operating point on the test set and then reporting test metrics
-at that point is **optimistically biased**: the threshold has been fitted to
-the same 293 images the result is claimed on. The reported 0.977 is therefore
-an upper bound on itself, not an independent estimate.
+The chosen 0.70 came from `test_scores_backend.csv` — the **held-out test
+split**. Selecting the operating point there and then reporting test metrics at
+that point is **optimistically biased**: the threshold has been fitted to the
+same 293 images the result is claimed on, so the reported 0.977 is an upper
+bound on itself rather than an independent estimate.
 
 This is the single most likely thing a supervisor means by "not rigorous
-enough", and it is cheap to fix:
+enough". The tooling for the correct procedure is now in place:
 
-1. Score the **validation** split (290 images) through the backend inference
-   path → `artifacts/val_scores_backend.csv`.
-2. Run `select_threshold.py` on that file. Freeze the threshold it recommends.
-3. Score the **test** split and report precision/recall **at the frozen
-   threshold**, touching it no further.
+- `ml/score_split.py` — scores any split through `inference.score_images`, the
+  backend's own entry point, into `artifacts/<split>_scores_backend.csv`.
+- `select_threshold.py` now defaults to `val_scores_backend.csv`, and warns
+  when asked to sweep a file whose name contains `test`.
+- `select_threshold.py --at-threshold <value>` reports metrics at a frozen
+  threshold and offers no choice, so the reporting step cannot quietly become
+  a second selection step.
+
+**What is left is the run itself**, after the next training run produces a
+model:
+
+```bash
+./backend/.venv/bin/python ml/score_split.py val
+./backend/.venv/bin/python ml/select_threshold.py ml/artifacts/val_scores_backend.csv
+# freeze what it returns, then:
+./backend/.venv/bin/python ml/score_split.py test
+./backend/.venv/bin/python ml/select_threshold.py \
+    ml/artifacts/test_scores_backend.csv --at-threshold <frozen>
+```
+
+Then update `AI_CONFIDENCE_THRESHOLD` in `backend/.env`, and the results table
+and threshold sweep in `ml/README.md`.
 
 Expect the test precision to come out slightly lower than 0.977. That is the
 honest number, and reporting it with the method stated is worth more marks
 than a higher number obtained the current way.
-
-`select_threshold.py` should also have its default argument changed from
-`test_scores.csv` to `val_scores.csv`, so the wrong thing is not the easy
-thing.
 
 ---
 
@@ -159,7 +170,8 @@ makes `REPORT_PHOTO.confidence_score` mean what it appears to mean.
 
 ## Order of work
 
-1. Re-tune the threshold on validation, re-report on test. **(§1 — do first)**
+1. Re-tune the threshold on validation, re-report on test. **(§1 — tooling
+   done, needs a run against a trained model)**
 2. Add precision/recall/PR-AUC metrics and PR-AUC early stopping. **(§3)**
 3. Add the stronger augmentation pipeline and label smoothing. **(§2, §3)**
 4. Retrain across 3 seeds; report mean ± SD. **(§4)**

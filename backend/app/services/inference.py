@@ -149,6 +149,25 @@ def _preprocess(images: list[bytes]):
     return tf.stack(tensors)
 
 
+def score_images(images: list[bytes]) -> list[float]:
+    """Score raw image bytes with the real model and return P(smoking) each.
+
+    Exposed, rather than left inline in :func:`classify_photos`, so that
+    offline evaluation scores photographs through exactly the code path S10
+    uses. `ml/score_split.py` calls this to produce the CSVs the threshold is
+    selected from.
+
+    That matters more than it looks: resizing with PIL instead of TensorFlow
+    shifted individual scores by up to 0.46 here. A threshold calibrated on
+    scores from any other pipeline is calibrated for a model that is not the
+    one serving requests.
+    """
+    model = load_model()
+    batch = _preprocess(images)
+    probabilities = model.predict(batch, verbose=0)
+    return [float(row[POSITIVE_INDEX]) for row in probabilities]
+
+
 # ---------------------------------------------------------------------------
 # Classification
 # ---------------------------------------------------------------------------
@@ -174,10 +193,7 @@ def classify_photos(images: list[tuple[str, str, bytes]]) -> ClassificationResul
             )
         scores = [_stub_score(data) for _, _, data in images]
     else:
-        model = load_model()
-        batch = _preprocess([data for _, _, data in images])
-        probabilities = model.predict(batch, verbose=0)
-        scores = [float(row[POSITIVE_INDEX]) for row in probabilities]
+        scores = score_images([data for _, _, data in images])
 
     results: list[PhotoResult] = []
     for index, ((original_name, staged_name, _), confidence) in enumerate(
