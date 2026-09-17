@@ -65,8 +65,26 @@ from pathlib import Path
 POSITIVE = "smoking"
 
 # Of the reports the system accepts, at least this share must be genuine.
-# Raise it if a false report reaching enforcement is judged more costly.
-DEFAULT_TARGET_PRECISION = 0.95
+#
+# 0.99, not the 0.95 that reads like a natural default, because PER-PHOTO
+# precision is not what the system delivers. A report carries up to three
+# photographs and passes when ANY ONE of them clears the threshold, so a false
+# positive gets three independent chances while a false negative needs all
+# three to fail. Per-photo precision of 0.95 — a 5% per-photo false-positive
+# rate on a balanced split — becomes roughly a 14% chance that an invalid
+# report reaches enforcement. README.md section 8 makes this argument and
+# overrode this script by hand because of it; encoding it here stops the
+# override being needed, and stops it being forgotten.
+#
+# The sweep below prints the report-level rate next to the per-photo one, so
+# the amplification is visible while the threshold is being chosen rather than
+# discovered afterwards.
+DEFAULT_TARGET_PRECISION = 0.99
+
+# A report carries at most this many photographs, and passes when at least
+# PHOTOS_TO_PASS of them clear the threshold (SCOPE-System-Flow-Revised.md §8).
+PHOTOS_PER_REPORT = 3
+PHOTOS_TO_PASS = 1
 
 
 def load_scores(path: Path) -> list[tuple[int, float]]:
@@ -125,6 +143,28 @@ def load_scores(path: Path) -> list[tuple[int, float]]:
     return rows
 
 
+def _at_least(k: int, n: int, p: float) -> float:
+    """P(at least k of n independent trials succeed), each with probability p."""
+    from math import comb
+    return sum(comb(n, i) * p**i * (1 - p)**(n - i) for i in range(k, n + 1))
+
+
+def report_rates(fpr: float, fnr: float) -> tuple[float, float]:
+    """Turn per-photo error rates into per-REPORT ones.
+
+    This is the quantity the operating point should actually be chosen on: a
+    reporter submits up to three photographs of one incident, and §8 accepts
+    the report when at least one clears the threshold.
+
+    Assumes the three photographs fail independently, which flatters the
+    result — they share a scene, a light level and a photographer. Treat these
+    as a lower bound on the true invalid-report rate, and say so in the report.
+    """
+    invalid = _at_least(PHOTOS_TO_PASS, PHOTOS_PER_REPORT, fpr)
+    missed = 1.0 - _at_least(PHOTOS_TO_PASS, PHOTOS_PER_REPORT, 1.0 - fnr)
+    return invalid, missed
+
+
 def metrics_at(rows: list[tuple[int, float]], threshold: float) -> dict[str, float]:
     tp = sum(1 for y, s in rows if y == 1 and s >= threshold)
     fp = sum(1 for y, s in rows if y == 0 and s >= threshold)
@@ -135,6 +175,10 @@ def metrics_at(rows: list[tuple[int, float]], threshold: float) -> dict[str, flo
     recall = tp / (tp + fn) if (tp + fn) else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
 
+    fpr = fp / (fp + tn) if (fp + tn) else 0.0
+    fnr = fn / (tp + fn) if (tp + fn) else 0.0
+    invalid_report, missed_report = report_rates(fpr, fnr)
+
     return {
         "threshold": threshold,
         "tp": tp, "fp": fp, "fn": fn, "tn": tn,
@@ -142,6 +186,10 @@ def metrics_at(rows: list[tuple[int, float]], threshold: float) -> dict[str, flo
         "recall": recall,
         "f1": f1,
         "accuracy": (tp + tn) / len(rows),
+        "fpr": fpr,
+        "fnr": fnr,
+        "invalid_report": invalid_report,
+        "missed_report": missed_report,
     }
 
 
@@ -252,12 +300,19 @@ def main() -> int:
 
     print("Threshold sweep")
     print(f"{'thresh':>7} {'prec':>7} {'recall':>7} {'F1':>7} "
-          f"{'TP':>5} {'FP':>5} {'FN':>5} {'TN':>5}")
+          f"{'TP':>5} {'FP':>5} {'FN':>5} {'TN':>5} {'bad rpt':>9}")
     for r in results:
         if round(r["threshold"] * 100) % 5:
             continue
         print(f"{r['threshold']:>7.2f} {r['precision']:>7.3f} {r['recall']:>7.3f} "
-              f"{r['f1']:>7.3f} {r['tp']:>5} {r['fp']:>5} {r['fn']:>5} {r['tn']:>5}")
+              f"{r['f1']:>7.3f} {r['tp']:>5} {r['fp']:>5} {r['fn']:>5} {r['tn']:>5} "
+              f"{r['invalid_report'] * 100:>8.2f}%")
+    print()
+    print(f"'bad rpt' is the share of invalid {PHOTOS_PER_REPORT}-photo reports that would")
+    print(f"reach enforcement, given that {PHOTOS_TO_PASS} clearing photo(s) accepts a report.")
+    print("It is the number the operating point should be judged on — not per-photo")
+    print("precision — and it assumes the photographs fail independently, which they")
+    print("do not entirely, so it is a LOWER bound.")
 
     print()
     print(f"Best F1 (NOT the recommendation): threshold {best_f1['threshold']:.2f}, "
@@ -288,8 +343,26 @@ def main() -> int:
     print(f"  Confusion  TP {chosen['tp']}  FP {chosen['fp']}  "
           f"FN {chosen['fn']}  TN {chosen['tn']}")
     print()
-    print(f"  {chosen['fp']} invalid report(s) would reach enforcement.")
-    print(f"  {chosen['fn']} genuine report(s) would be asked to retake.")
+    print(f"  {chosen['fp']} invalid photo(s) accepted, {chosen['fn']} genuine "
+          f"photo(s) rejected.")
+    print()
+    print(f"  At the report level, with {PHOTOS_PER_REPORT} photographs and "
+          f"{PHOTOS_TO_PASS} needed to pass:")
+    print(f"    {chosen['invalid_report'] * 100:.2f}% of invalid reports would "
+          f"reach enforcement")
+    print(f"    {chosen['missed_report'] * 100:.3f}% of genuine reports would be "
+          f"wrongly rejected")
+
+    # The alternative rule from NEXT-STEPS §6, priced at the same threshold: it
+    # costs no model change and is usually the cheapest precision available.
+    stricter = _at_least(2, PHOTOS_PER_REPORT, chosen["fpr"])
+    stricter_missed = 1.0 - _at_least(2, PHOTOS_PER_REPORT, 1.0 - chosen["fnr"])
+    if PHOTOS_TO_PASS == 1:
+        print()
+        print("  For comparison, requiring 2 of 3 photographs instead of 1:")
+        print(f"    {stricter * 100:.2f}% invalid reports accepted "
+              f"({stricter_missed * 100:.3f}% genuine rejected)")
+        print("  No model change and no retraining — only the §8 rule.")
     print()
     print("Set this in backend/.env, then restart the backend:")
     print(f"  AI_CONFIDENCE_THRESHOLD={chosen['threshold']:.4f}")
