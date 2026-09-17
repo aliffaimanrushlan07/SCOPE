@@ -294,3 +294,9 @@ implemented; the figures are not yet re-measured under it.
 | `artifacts/vit-scope-v1.keras` | Trained model, ~982 MB (gitignored) |
 | `artifacts/val_scores_backend.csv` | Scores the threshold is SELECTED on |
 | `artifacts/test_scores_backend.csv` | Scores the threshold is REPORTED on |
+
+
+| Model | Threshold chosen on | Precision | Recall | PR-AUC |
+|---|---|---|---|---|
+| vit-scope-v1 | test (biased) | 0.977 | 0.916 | not measured |
+| vit-scope-v2 | validation | 0.939 | 0.979 | 0.959 |
