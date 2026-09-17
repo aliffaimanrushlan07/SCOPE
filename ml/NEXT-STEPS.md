@@ -137,18 +137,37 @@ does not fight the threshold selection in §1.
 
 ---
 
-## 4. One run is not a result
+## 4. One run is not a result — TOOLING DONE, RUNS OUTSTANDING
 
-The README already concedes this: the test split was used once, so the
-figures carry the variance of a single training run. A supervisor is entitled
-to ask how much of 0.977 is the method and how much is the seed.
+Every figure so far comes from one training run, so it carries that run's
+variance: the head starts random, the images arrive in a random order, and the
+augmentation crops at random. On 293 test images the difference between 3 false
+positives and 6 is one unlucky initialisation.
 
-Retrain with **3 seeds** and report **mean ± standard deviation** for
-precision, recall, F1 and PR-AUC. On a T4 this is a few hours of Colab, not a
-redesign.
+- **Notebook section 11** retrains the same recipe on the same split at seeds
+  1, 2 and 3, and writes per-seed val/test scores. It exports scores only, not
+  three ~1 GB checkpoints.
+- **`ml/aggregate_seeds.py`** puts each seed through the whole procedure
+  independently — threshold selected on that seed's own validation split, test
+  metrics reported at that frozen threshold — then prints mean ± SD for
+  precision, recall, F1 and PR-AUC.
 
-If the three runs disagree by more than a point or two, that spread is itself
-a finding worth stating.
+Selecting per seed rather than sharing one threshold is deliberate: the spread
+then answers the question actually being asked, which is what would have
+happened had the whole method been run once with a different seed.
+
+### The other half of the uncertainty
+
+Seeds are not the only reason a number moves. With 151 non-smoking test images,
+the 95% confidence interval on precision is roughly ±0.03 whatever the seed
+does — and **averaging over seeds does not shrink it.** Only more labelled test
+data does.
+
+`select_threshold.py --at-threshold` now prints Wilson intervals alongside the
+point estimates, and `aggregate_seeds.py` compares the two sources of
+uncertainty and says which dominates. Report both. A supervisor asking "how much
+of this is luck?" is asking about both, and quoting only the seed spread answers
+half the question.
 
 ---
 
@@ -188,7 +207,8 @@ makes `REPORT_PHOTO.confidence_score` mean what it appears to mean.
    implemented, needs a run)**
 3. Add the stronger augmentation pipeline and label smoothing. **(§2, §3 —
    implemented, needs a run)**
-4. Retrain across 3 seeds; report mean ± SD. **(§4)**
+4. Retrain across 3 seeds; report mean ± SD. **(§4 — implemented, needs the
+   runs)**
 5. Calibrate. **(§5)**
 6. TTA and the ≥2-photo analysis. **(§6)**
 

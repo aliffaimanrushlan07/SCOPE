@@ -263,7 +263,14 @@ party.
 
 **Single evaluation run.** The test split was used once. Figures are not
 averaged over repeated runs with different seeds, so they carry the variance of
-a single training run.
+a single training run. Section 11 of the notebook and `aggregate_seeds.py`
+measure that spread; until they have been run, quote the confidence intervals
+`select_threshold.py` prints and say the seed variance is unmeasured.
+
+**The test split is small.** With 151 non-smoking images, the 95% confidence
+interval on precision is roughly ±0.03. Averaging over training seeds does not
+narrow that — only more labelled test data would. Both sources of uncertainty
+should be stated; neither alone answers "how much of this is luck".
 
 **The published threshold was selected on the test split.** Until the model is
 retrained and the validation-first procedure in section 5 is run end to end,
@@ -279,6 +286,7 @@ implemented; the figures are not yet re-measured under it.
 | `prepare_dataset.py` | De-duplicate, split, manifest |
 | `make_colab_bundle.py` | Resize + zip for upload |
 | `score_split.py` | Score a split through the backend's inference code |
+| `aggregate_seeds.py` | mean ± SD across training seeds |
 | `select_threshold.py` | Threshold selection (val) and reporting (test) |
 | `notebooks/finetune_vit.ipynb` | Training |
 | `data/manifest.csv` | The authoritative split (gitignored) |

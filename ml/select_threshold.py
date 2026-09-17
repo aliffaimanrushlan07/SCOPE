@@ -143,6 +143,30 @@ def load_scores(path: Path) -> list[tuple[int, float]]:
     return rows
 
 
+def wilson_interval(successes: int, trials: int, z: float = 1.96) -> tuple[float, float]:
+    """95% confidence interval for a proportion (Wilson score).
+
+    Precision on this test split is 131 correct out of 135 accepted. Quoting
+    that as "0.970" implies a precision the sample size cannot support: with
+    only 151 non-smoking images, the difference between 3 false positives and
+    6 is one or two photographs.
+
+    Wilson rather than the textbook normal approximation because the counts
+    here are small and the proportions near 1, exactly where the normal
+    approximation produces intervals that run above 100%.
+    """
+    if trials == 0:
+        return (0.0, 1.0)
+
+    from math import sqrt
+
+    p = successes / trials
+    denominator = 1 + z * z / trials
+    centre = (p + z * z / (2 * trials)) / denominator
+    half = z * sqrt(p * (1 - p) / trials + z * z / (4 * trials * trials)) / denominator
+    return (max(0.0, centre - half), min(1.0, centre + half))
+
+
 def _at_least(k: int, n: int, p: float) -> float:
     """P(at least k of n independent trials succeed), each with probability p."""
     from math import comb
@@ -245,11 +269,16 @@ def report_at(rows: list[tuple[int, float]], threshold: float) -> int:
 
     m = metrics_at(rows, threshold)
 
+    precision_lo, precision_hi = wilson_interval(m["tp"], m["tp"] + m["fp"])
+    recall_lo, recall_hi = wilson_interval(m["tp"], m["tp"] + m["fn"])
+
     print("=" * 62)
     print(f"  METRICS AT THE FROZEN THRESHOLD: {threshold:.4f}")
     print("=" * 62)
-    print(f"  Precision {m['precision']:.3f}")
-    print(f"  Recall    {m['recall']:.3f}")
+    print(f"  Precision {m['precision']:.3f}   95% CI "
+          f"[{precision_lo:.3f}, {precision_hi:.3f}]")
+    print(f"  Recall    {m['recall']:.3f}   95% CI "
+          f"[{recall_lo:.3f}, {recall_hi:.3f}]")
     print(f"  F1        {m['f1']:.3f}")
     print(f"  Accuracy  {m['accuracy']:.3f}")
     print(f"  Confusion  TP {m['tp']}  FP {m['fp']}  "
@@ -268,7 +297,16 @@ def report_at(rows: list[tuple[int, float]], threshold: float) -> int:
     print(f"  \"At a threshold of {threshold:.2f}, selected on the validation")
     print(f"  split, the classifier reached precision {m['precision']:.3f} and "
           f"recall {m['recall']:.3f}")
-    print(f"  on the held-out test split ({len(rows)} images).\"")
+    print(f"  on the held-out test split ({len(rows)} images), with a 95%")
+    print(f"  confidence interval on precision of "
+          f"[{precision_lo:.3f}, {precision_hi:.3f}].\"")
+    print()
+    print("Quote the interval, not just the point estimate. With "
+          f"{m['fp'] + m['tn']} non-positive images,")
+    print(f"the difference between {m['fp']} false positives and "
+          f"{m['fp'] + 2} is a couple of photographs —")
+    print("and averaging over training seeds does not shrink that; only more test")
+    print("data does.")
     print()
     print("Do not tune the threshold against these numbers. If it is changed "
           "after seeing them,")
