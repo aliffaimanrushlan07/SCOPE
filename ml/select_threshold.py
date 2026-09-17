@@ -255,6 +255,15 @@ def report_at(rows: list[tuple[int, float]], threshold: float) -> int:
     print(f"  Confusion  TP {m['tp']}  FP {m['fp']}  "
           f"FN {m['fn']}  TN {m['tn']}")
     print()
+    print(f"  At the report level ({PHOTOS_PER_REPORT} photographs, "
+          f"{PHOTOS_TO_PASS} needed to pass):")
+    print(f"    {m['invalid_report'] * 100:.2f}% of invalid reports reach enforcement")
+    print(f"    {m['missed_report'] * 100:.3f}% of genuine reports wrongly rejected")
+    stricter = _at_least(2, PHOTOS_PER_REPORT, m["fpr"])
+    stricter_missed = 1.0 - _at_least(2, PHOTOS_PER_REPORT, 1.0 - m["fnr"])
+    print(f"    requiring 2 of {PHOTOS_PER_REPORT} instead: "
+          f"{stricter * 100:.2f}% invalid ({stricter_missed * 100:.3f}% genuine rejected)")
+    print()
     print("Report it as a sentence, with the threshold and the split named:")
     print(f"  \"At a threshold of {threshold:.2f}, selected on the validation")
     print(f"  split, the classifier reached precision {m['precision']:.3f} and "
