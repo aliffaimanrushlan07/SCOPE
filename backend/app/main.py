@@ -24,6 +24,23 @@ from app.routers.admin import reports as admin_reports
 from app.services import inference, storage
 
 settings = get_settings()
+
+# Uvicorn configures handlers for its OWN loggers and leaves the root logger
+# with none, so an application logger like "scope" falls back to Python's
+# last-resort handler — which is fixed at WARNING. Every logger.info below was
+# therefore being written nowhere, including the startup line that reports
+# which model and threshold are actually serving requests. That line exists to
+# be checked before a demo; silently dropping it defeats the point.
+#
+# basicConfig only adds a handler when the root has none, so this does not
+# fight uvicorn: its own loggers set propagate=False and keep their handlers,
+# and nothing is logged twice.
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s:     %(name)s - %(message)s",
+    )
+
 logger = logging.getLogger("scope")
 
 
