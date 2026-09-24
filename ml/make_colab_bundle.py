@@ -68,6 +68,11 @@ def main() -> int:
         target_dir = STAGE / "data" / "images" / label
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / f"{source.stem}.jpg"
+        # Subfolders such as notsmoking/hard_negatives/ can repeat a filename
+        # (phones all name photos IMG_0001), which would overwrite a bundled
+        # image and point two manifest rows at one file.
+        if target.exists():
+            target = target_dir / f"{source.stem}_{row['phash']}.jpg"
 
         try:
             with Image.open(source) as img:

@@ -189,6 +189,32 @@ def report_rates(fpr: float, fnr: float) -> tuple[float, float]:
     return invalid, missed
 
 
+HARD_NEGATIVE_DIR = "hard_negatives"
+
+
+def print_hard_negatives(scores_path: Path, threshold: float) -> None:
+    """False-positive rate on data/raw/notsmoking/hard_negatives/ alone.
+
+    Hard negatives are a small share of the split, so the overall precision
+    barely moves when the model gets them wrong. This is the number that
+    shows whether the retrain fixed the look-alikes it was collected for.
+    """
+    with scores_path.open() as handle:
+        scores = [
+            float(row["score"]) for row in csv.DictReader(handle)
+            if HARD_NEGATIVE_DIR in Path(row.get("path") or "").parts
+        ]
+    if not scores:
+        return
+
+    accepted = sum(1 for s in scores if s >= threshold)
+    low, high = wilson_interval(accepted, len(scores))
+    print(f"  Hard negatives ({HARD_NEGATIVE_DIR}/): {accepted} of {len(scores)} "
+          f"wrongly accepted ({accepted / len(scores) * 100:.1f}%, "
+          f"95% CI {low * 100:.1f}–{high * 100:.1f}%)")
+    print()
+
+
 def metrics_at(rows: list[tuple[int, float]], threshold: float) -> dict[str, float]:
     tp = sum(1 for y, s in rows if y == 1 and s >= threshold)
     fp = sum(1 for y, s in rows if y == 0 and s >= threshold)
@@ -262,7 +288,9 @@ def warn_if_test_split(path: Path) -> None:
     print()
 
 
-def report_at(rows: list[tuple[int, float]], threshold: float) -> int:
+def report_at(
+    rows: list[tuple[int, float]], threshold: float, scores_path: Path
+) -> int:
     """Print the metrics at a threshold chosen elsewhere. No selection here."""
     if not 0.0 < threshold < 1.0:
         sys.exit(f"--at-threshold must be between 0 and 1, got {threshold}.")
@@ -284,6 +312,7 @@ def report_at(rows: list[tuple[int, float]], threshold: float) -> int:
     print(f"  Confusion  TP {m['tp']}  FP {m['fp']}  "
           f"FN {m['fn']}  TN {m['tn']}")
     print()
+    print_hard_negatives(scores_path, threshold)
     print(f"  At the report level ({PHOTOS_PER_REPORT} photographs, "
           f"{PHOTOS_TO_PASS} needed to pass):")
     print(f"    {m['invalid_report'] * 100:.2f}% of invalid reports reach enforcement")
@@ -338,7 +367,7 @@ def main() -> int:
           f"({positives} smoking, {len(rows) - positives} not smoking)\n")
 
     if args.at_threshold is not None:
-        return report_at(rows, args.at_threshold)
+        return report_at(rows, args.at_threshold, args.scores)
 
     warn_if_test_split(args.scores)
 
@@ -393,6 +422,7 @@ def main() -> int:
     print(f"  {chosen['fp']} invalid photo(s) accepted, {chosen['fn']} genuine "
           f"photo(s) rejected.")
     print()
+    print_hard_negatives(args.scores, chosen["threshold"])
     print(f"  At the report level, with {PHOTOS_PER_REPORT} photographs and "
           f"{PHOTOS_TO_PASS} needed to pass:")
     print(f"    {chosen['invalid_report'] * 100:.2f}% of invalid reports would "

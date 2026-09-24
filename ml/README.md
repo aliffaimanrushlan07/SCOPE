@@ -150,6 +150,14 @@ ml/data/raw/notsmoking/    1,005 images
 single split, so near-identical frames cannot straddle train and test. Seeded
 and reproducible; splitting happens before augmentation.
 
+**Adding images later** (e.g. hard negatives in
+`data/raw/notsmoking/hard_negatives/`): run with `--keep-split`. Without it,
+one new image changes the shuffle order and moves about a quarter of the
+existing images to a different split, so the new model could no longer be
+compared with the old one on the same test set. With it, existing images stay
+put and only the new ones are divided 70/15/15. `select_threshold.py` then
+reports the false-positive rate on `hard_negatives/` separately.
+
 ### 3. Bundle for Colab
 
 ```bash

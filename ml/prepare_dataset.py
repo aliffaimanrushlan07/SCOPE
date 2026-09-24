@@ -148,30 +148,54 @@ def group_by_hash(records: list[ImageRecord]) -> dict[str, list[ImageRecord]]:
     return groups
 
 
+def load_frozen_splits() -> dict[str, str]:
+    """{phash: split} from the current manifest, for --keep-split."""
+    if not MANIFEST.exists():
+        sys.exit(
+            f"--keep-split needs the existing manifest at {MANIFEST}.\n"
+            "It keeps every image already in that manifest in its current "
+            "split, so there has to be one to keep."
+        )
+    with MANIFEST.open() as handle:
+        return {row["phash"]: row["split"] for row in csv.DictReader(handle)}
+
+
 def assign_splits(
-    groups: dict[str, list[ImageRecord]], ratios: tuple[float, float, float]
+    groups: dict[str, list[ImageRecord]],
+    ratios: tuple[float, float, float],
+    frozen: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Assign each hash group to one split, stratified by class.
 
     Returns {phash: split}. Because the unit of assignment is the GROUP, not
     the image, near-identical frames always land together.
+
+    Groups found in `frozen` keep the split they already had; only the rest
+    are shuffled and divided. Without this, adding a single image changes the
+    shuffle order and moves many existing images between splits, so a new
+    model could no longer be compared with the old one on the same test set.
     """
     rng = random.Random(SEED)
+    frozen = frozen or {}
 
     # A group's class is the class of its members. In the rare case a
     # duplicate appears under both labels the group is dropped entirely — it is
     # a labelling contradiction and training on it teaches noise.
     by_class: dict[str, list[str]] = defaultdict(list)
     conflicted: list[str] = []
+    kept: dict[str, str] = {}
 
     for phash, members in groups.items():
         labels = {m.label for m in members}
         if len(labels) > 1:
             conflicted.append(phash)
             continue
+        if phash in frozen:
+            kept[phash] = frozen[phash]
+            continue
         by_class[labels.pop()].append(phash)
 
-    assignment: dict[str, str] = {}
+    assignment: dict[str, str] = dict(kept)
     for phash in conflicted:
         assignment[phash] = "conflict"
 
@@ -294,6 +318,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train", type=float, default=DEFAULT_RATIOS[0])
     parser.add_argument("--val", type=float, default=DEFAULT_RATIOS[1])
+    parser.add_argument(
+        "--keep-split", action="store_true",
+        help="Keep every image already in manifest.csv in its current split "
+             "and split only the newly added images. Use when adding data to "
+             "an existing dataset, so models stay comparable on one test set.",
+    )
     args = parser.parse_args()
 
     ratios = (args.train, args.val, 1.0 - args.train - args.val)
@@ -308,8 +338,23 @@ def main() -> int:
     groups = group_by_hash(records)
     duplicates = len(records) - len(groups)
 
-    assignment = assign_splits(groups, ratios)
+    frozen = load_frozen_splits() if args.keep_split else None
+    assignment = assign_splits(groups, ratios, frozen)
     conflicts = sum(1 for v in assignment.values() if v == "conflict")
+
+    if frozen is not None:
+        kept = sum(1 for phash in groups if phash in frozen)
+        added: dict[str, int] = defaultdict(int)
+        for phash, split in assignment.items():
+            if phash not in frozen and split != "conflict":
+                added[split] += 1
+        missing = len(set(frozen) - set(groups))
+        print(f"--keep-split: {kept} images kept in their existing split; "
+              f"new images added to train {added['train']}, "
+              f"val {added['val']}, test {added['test']}.")
+        if missing:
+            print(f"WARNING: {missing} images in the old manifest are no longer "
+                  "in data/raw/ and have been dropped.")
 
     rows = write_manifest(groups, assignment)
     report = write_report(rows, len(records), skipped, conflicts, duplicates)
