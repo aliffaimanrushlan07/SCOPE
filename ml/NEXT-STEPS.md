@@ -27,105 +27,147 @@ Any plan that proposes these is proposing work that is finished.
 
 ---
 
-## 1. The threshold is tuned on the test set — fix this first
+## 1. The threshold is tuned on the test set — TOOLING DONE, RUN OUTSTANDING
 
-`select_threshold.py` defaults to `artifacts/test_scores.csv`, and the chosen
-0.70 came from `test_scores_backend.csv`. Both are the **held-out test split**.
-
-Selecting the operating point on the test set and then reporting test metrics
-at that point is **optimistically biased**: the threshold has been fitted to
-the same 293 images the result is claimed on. The reported 0.977 is therefore
-an upper bound on itself, not an independent estimate.
+The chosen 0.70 came from `test_scores_backend.csv` — the **held-out test
+split**. Selecting the operating point there and then reporting test metrics at
+that point is **optimistically biased**: the threshold has been fitted to the
+same 293 images the result is claimed on, so the reported 0.977 is an upper
+bound on itself rather than an independent estimate.
 
 This is the single most likely thing a supervisor means by "not rigorous
-enough", and it is cheap to fix:
+enough". The tooling for the correct procedure is now in place:
 
-1. Score the **validation** split (290 images) through the backend inference
-   path → `artifacts/val_scores_backend.csv`.
-2. Run `select_threshold.py` on that file. Freeze the threshold it recommends.
-3. Score the **test** split and report precision/recall **at the frozen
-   threshold**, touching it no further.
+- `ml/score_split.py` — scores any split through `inference.score_images`, the
+  backend's own entry point, into `artifacts/<split>_scores_backend.csv`.
+- `select_threshold.py` now defaults to `val_scores_backend.csv`, and warns
+  when asked to sweep a file whose name contains `test`.
+- `select_threshold.py --at-threshold <value>` reports metrics at a frozen
+  threshold and offers no choice, so the reporting step cannot quietly become
+  a second selection step.
+
+**What is left is the run itself**, after the next training run produces a
+model:
+
+```bash
+./backend/.venv/bin/python ml/score_split.py val
+./backend/.venv/bin/python ml/select_threshold.py ml/artifacts/val_scores_backend.csv
+# freeze what it returns, then:
+./backend/.venv/bin/python ml/score_split.py test
+./backend/.venv/bin/python ml/select_threshold.py \
+    ml/artifacts/test_scores_backend.csv --at-threshold <frozen>
+```
+
+Then update `AI_CONFIDENCE_THRESHOLD` in `backend/.env`, and the results table
+and threshold sweep in `ml/README.md`.
 
 Expect the test precision to come out slightly lower than 0.977. That is the
 honest number, and reporting it with the method stated is worth more marks
 than a higher number obtained the current way.
 
-`select_threshold.py` should also have its default argument changed from
-`test_scores.csv` to `val_scores.csv`, so the wrong thing is not the easy
-thing.
-
 ---
 
-## 2. Augmentation is the weakest part of training
+## 2. Augmentation is the weakest part of training — IMPLEMENTED, RUN OUTSTANDING
 
-Current augmentation (notebook cell 8) is horizontal flip plus brightness,
-contrast and saturation jitter. That is a light CNN-era recipe, and Vision
-Transformers are known to need more on datasets of this size — 1,358 training
-images is small for a ViT-Base.
+The old recipe was horizontal flip plus brightness/contrast/saturation jitter:
+a light CNN-era pipeline for a ViT-Base on 1,358 images, and one that did not
+rehearse the domain gap the README names — real submissions are **further
+away, more motion-blurred and worse lit** than web-sourced photographs.
 
-It also does not rehearse the domain gap the README names honestly: real
-submissions will be **further away, more motion-blurred and worse lit** than
-web-sourced photographs. The augmentation should simulate exactly that.
+Notebook cell 8 now implements, in `tf.image`:
 
-Add, in rough order of value:
-
-| Technique | Why here | Source |
+| Technique | Why here | State |
 |---|---|---|
-| RandomResizedCrop (scale 0.6–1.0) | Rehearses subject distance — the main domain gap | standard ViT recipe |
-| Motion blur, Gaussian blur, JPEG compression, downscale | Rehearses phone-camera conditions; also makes the "too blurry" band meaningful | [albumentations](https://github.com/albumentations-team/albumentations) |
-| RandAugment | Standard ViT policy; replaces the hand-rolled jitter | [DeiT](https://github.com/facebookresearch/deit), arXiv:2012.12877 |
-| Mixup + CutMix | The DeiT recipe's main defence against ViT overfitting on small data | same |
-| Random Erasing | Occlusion robustness (hands, phones, crowds) | same |
+| RandomResizedCrop, scale 0.6–1.0 | Rehearses subject distance — the main domain gap | done |
+| Random horizontal flip | Kept from the old recipe | done |
+| RandAugment-style policy, N=2 ops | Replaces three hand-tuned constants with a sampled policy | done |
+| Gaussian blur, motion blur, downscale, JPEG | Rehearses phone-camera conditions | done |
+| Random erasing | Occlusion robustness (hands, phones, crowds) | done |
+| Mixup + CutMix | The other half of the DeiT recipe | **not done — see below** |
 
-`keras_cv.layers` provides `RandAugment`, `MixUp`, `CutMix` and
-`RandomCutout` as Keras layers, so this stays inside the TensorFlow stack that
-Table 3.5 commits to. No PyTorch needed.
+Two deliberate departures from the plan as first written:
 
-Note: Mixup and CutMix produce soft labels, so the loss must move from
-`SparseCategoricalCrossentropy` to `CategoricalCrossentropy` with one-hot
-labels.
+**Hand-rolled `tf.image`, not `keras_cv`.** keras-cv is in maintenance and its
+co-install with Keras 3 and keras-hub is fragile on Colab; a broken import at
+the top of a training run costs more than the citation is worth. The policy is
+therefore *RandAugment-style* — N ops sampled at a shared magnitude — and not
+the published op list, which the report should say. Cite arXiv:1909.13719 for
+the method, not for this implementation.
 
----
+**Mixup and CutMix are still outstanding.** They produce soft labels that
+interact with the label smoothing added in §3, and their effect is worth
+measuring on its own row of the results table rather than bundled in with
+everything else here.
 
-## 3. Training is not measuring the thing being optimised
+The crop takes its region from the image as stored (long side 256), not from a
+pre-resized 224 copy, so it keeps detail a pre-resize would have discarded.
 
-`metrics=['accuracy']` and `EarlyStopping(monitor='val_loss')`. Neither is
-precision. The retained checkpoint is therefore the one with the best loss,
-not the one that would serve S10 best.
-
-```python
-metrics=[
-    'accuracy',
-    keras.metrics.Precision(name='precision'),
-    keras.metrics.Recall(name='recall'),
-    keras.metrics.AUC(name='pr_auc', curve='PR'),
-]
-...
-keras.callbacks.EarlyStopping(monitor='val_pr_auc', mode='max',
-                              patience=3, restore_best_weights=True)
-```
-
-PR-AUC rather than precision-at-0.5, because it is threshold-independent and
-so does not fight the threshold selection in §1.
-
-Add label smoothing at the same time — `label_smoothing=0.1`. The score
-distribution (mean 0.939 for smoking, 0.055 for not) is very hard, which is
-exactly the over-confidence label smoothing exists to temper.
+**What is left is the retrain**, and a row in the results table comparing
+precision and recall before and after.
 
 ---
 
-## 4. One run is not a result
+## 3. Training is not measuring the thing being optimised — IMPLEMENTED, RUN OUTSTANDING
 
-The README already concedes this: the test split was used once, so the
-figures carry the variance of a single training run. A supervisor is entitled
-to ask how much of 0.977 is the method and how much is the seed.
+`metrics=['accuracy']` and `EarlyStopping(monitor='val_loss')` meant the
+retained checkpoint was the one with the best loss, not the one that serves S10
+best. Cell 10 now compiles with precision, recall and PR-AUC, and both training
+stages early-stop on `val_pr_auc` with `mode='max'`.
 
-Retrain with **3 seeds** and report **mean ± standard deviation** for
-precision, recall, F1 and PR-AUC. On a T4 this is a few hours of Colab, not a
-redesign.
+Two things that are easy to get wrong here, and are handled:
 
-If the three runs disagree by more than a point or two, that spread is itself
-a finding worth stating.
+**The metrics read the positive-class column.** `keras.metrics.Precision` on a
+2-column softmax compares the whole output against the whole target, averaging
+the positive class with its own complement. On a worked example that reports
+0.600 where the real positive-class precision is 0.667. The notebook therefore
+wraps Precision, Recall and AUC to slice `[:, POSITIVE_INDEX]` first.
+
+**`mode='max'` is not optional.** With the default `mode='auto'` on an
+unrecognised metric name, Keras can minimise PR-AUC and restore the worst
+weights of the run.
+
+Label smoothing (`label_smoothing=0.1`) went in at the same time. It forced the
+loss from `SparseCategoricalCrossentropy` to `CategoricalCrossentropy` and the
+labels to one-hot, since Keras implements smoothing only on the latter — the
+same change Mixup would have needed. Smoothing is applied inside the loss, so
+the metrics still see clean 0/1 targets.
+
+PR-AUC rather than precision-at-0.5, because it is threshold-independent and so
+does not fight the threshold selection in §1.
+
+---
+
+## 4. One run is not a result — TOOLING DONE, RUNS OUTSTANDING
+
+Every figure so far comes from one training run, so it carries that run's
+variance: the head starts random, the images arrive in a random order, and the
+augmentation crops at random. On 293 test images the difference between 3 false
+positives and 6 is one unlucky initialisation.
+
+- **Notebook section 11** retrains the same recipe on the same split at seeds
+  1, 2 and 3, and writes per-seed val/test scores. It exports scores only, not
+  three ~1 GB checkpoints.
+- **`ml/aggregate_seeds.py`** puts each seed through the whole procedure
+  independently — threshold selected on that seed's own validation split, test
+  metrics reported at that frozen threshold — then prints mean ± SD for
+  precision, recall, F1 and PR-AUC.
+
+Selecting per seed rather than sharing one threshold is deliberate: the spread
+then answers the question actually being asked, which is what would have
+happened had the whole method been run once with a different seed.
+
+### The other half of the uncertainty
+
+Seeds are not the only reason a number moves. With 151 non-smoking test images,
+the 95% confidence interval on precision is roughly ±0.03 whatever the seed
+does — and **averaging over seeds does not shrink it.** Only more labelled test
+data does.
+
+`select_threshold.py --at-threshold` now prints Wilson intervals alongside the
+point estimates, and `aggregate_seeds.py` compares the two sources of
+uncertainty and says which dominates. Report both. A supervisor asking "how much
+of this is luck?" is asking about both, and quoting only the seed spread answers
+half the question.
 
 ---
 
@@ -159,12 +201,21 @@ makes `REPORT_PHOTO.confidence_score` mean what it appears to mean.
 
 ## Order of work
 
-1. Re-tune the threshold on validation, re-report on test. **(§1 — do first)**
-2. Add precision/recall/PR-AUC metrics and PR-AUC early stopping. **(§3)**
-3. Add the stronger augmentation pipeline and label smoothing. **(§2, §3)**
-4. Retrain across 3 seeds; report mean ± SD. **(§4)**
+1. Re-tune the threshold on validation, re-report on test. **(§1 — tooling
+   done, needs a run against a trained model)**
+2. Add precision/recall/PR-AUC metrics and PR-AUC early stopping. **(§3 —
+   implemented, needs a run)**
+3. Add the stronger augmentation pipeline and label smoothing. **(§2, §3 —
+   implemented, needs a run)**
+4. Retrain across 3 seeds; report mean ± SD. **(§4 — implemented, needs the
+   runs)**
 5. Calibrate. **(§5)**
 6. TTA and the ≥2-photo analysis. **(§6)**
+
+Everything from §1 to §3 is now implemented but unmeasured: the next Colab run
+is what turns it into evidence. Export that model as **`vit-scope-v2`** and
+bump `AI_MODEL_VERSION` — `vit-scope-v1`'s scores were produced by a different
+recipe, and `AI_CLASSIFICATION.model_version` is what keeps them apart.
 
 Keep a results table from step 1, one row per change, precision and recall
 before and after. That table is the answer to "what techniques did you add" —

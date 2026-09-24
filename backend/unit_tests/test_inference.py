@@ -172,3 +172,52 @@ def test_passing_photos_empty_when_none_passed():
     )
 
     assert result.passing_photos == []
+
+
+# ---------------------------------------------------------------------------
+# score_images -- the shared real-model path
+# ---------------------------------------------------------------------------
+
+def test_classify_photos_uses_score_images_when_a_model_is_present(monkeypatch):
+    """TC-INF-16 (Valid): out of stub mode, classify_photos scores through
+    score_images -- the same entry point ml/score_split.py calls.
+
+    This is what keeps offline threshold selection and live S10 classification
+    on one code path. If they diverge, a threshold calibrated on the CSVs no
+    longer describes the model serving requests.
+    """
+    monkeypatch.setattr(inference.settings, "ai_stub_mode", False)
+    monkeypatch.setattr(inference.settings, "ai_confidence_threshold", 0.6)
+    monkeypatch.setattr(inference, "is_available", lambda: True)
+
+    seen: list[list[bytes]] = []
+
+    def fake_score_images(images):
+        seen.append(images)
+        return [0.9, 0.2]
+
+    monkeypatch.setattr(inference, "score_images", fake_score_images)
+
+    result = inference.classify_photos([
+        ("a.jpg", "0.jpg", b"first"),
+        ("b.jpg", "1.jpg", b"second"),
+    ])
+
+    assert seen == [[b"first", b"second"]]
+    assert [p.confidence for p in result.photos] == [0.9, 0.2]
+    assert result.outcome == inference.OUTCOME_PASS
+    assert result.photos_passed == 1
+
+
+def test_score_images_returns_positive_class_probability(monkeypatch):
+    """TC-INF-17 (Valid): score_images reads column 1 of the softmax output --
+    P(smoking) -- and not the notsmoking column, which would invert every
+    decision the system makes."""
+    class FakeModel:
+        def predict(self, batch, verbose=0):
+            return [[0.1, 0.9], [0.75, 0.25]]
+
+    monkeypatch.setattr(inference, "load_model", lambda: FakeModel())
+    monkeypatch.setattr(inference, "_preprocess", lambda images: images)
+
+    assert inference.score_images([b"a", b"b"]) == [0.9, 0.25]

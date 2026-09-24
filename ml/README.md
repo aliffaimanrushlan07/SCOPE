@@ -13,7 +13,7 @@ threshold and accepts the report when at least one photograph clears it.
 | Tooling (`prepare_dataset.py`, `select_threshold.py`, notebook) | ✅ |
 | Dataset assembled and split | ✅ 1,941 images |
 | Model fine-tuned | ✅ `vit-scope-v1` |
-| Threshold chosen | ✅ **0.70** |
+| Threshold chosen | ⚠️ **0.70**, but selected on the test split — [re-select on validation](#5-threshold) |
 | Wired into the backend | ✅ real inference, stub removed |
 
 ---
@@ -33,6 +33,23 @@ validated on 290, and evaluated **once** on 293 held-out test images.
 
 Mean score for smoking images **0.939**, for non-smoking **0.055** — a
 separation of 0.884, meaning the model is decisive rather than hedging.
+
+> **These figures are from `vit-scope-v1` and will change.** Two reasons.
+>
+> The 0.70 threshold was selected by sweeping these same test scores, so the
+> operating point was fitted to the images the result is claimed on. The
+> tooling for the correct procedure — select on validation, report on test — is
+> in place (`score_split.py`, and `select_threshold.py --at-threshold`).
+>
+> The training recipe has also changed since this run: stronger augmentation,
+> precision/recall/PR-AUC metrics, PR-AUC early stopping and label smoothing
+> (step 4 below). `vit-scope-v1` predates all of it.
+>
+> The next run trains under the new recipe and re-measures under the correct
+> procedure. **Export it as `vit-scope-v2`** and bump `AI_MODEL_VERSION`, so
+> `AI_CLASSIFICATION.model_version` keeps historical confidence scores
+> interpretable. Expect precision to fall slightly once the threshold is chosen
+> on validation. That is the honest figure, not a regression.
 
 ### Threshold sweep
 
@@ -148,6 +165,26 @@ and reproducible; splitting happens before augmentation.
 Two stages: freeze the backbone and train the head, then unfreeze and
 fine-tune at a lower learning rate.
 
+**Augmentation** (training split only, `tf.image`, no extra dependency):
+RandomResizedCrop at scale 0.6–1.0, horizontal flip, a RandAugment-style
+policy of two sampled colour operations, then at most one phone-camera
+degradation (Gaussian blur, motion blur, downscale, or JPEG re-encoding at
+quality 30–75), then random erasing. A ViT-Base overfits 1,358 images through a
+light recipe — this is the DeiT argument (arXiv:2012.12877) — and the crop and
+degradations rehearse the domain gap named under *Limitations* below. Mixup and
+CutMix are not included; they are worth measuring separately.
+
+**What training measures.** Precision, recall and PR-AUC on the positive class,
+with both stages early-stopping on `val_pr_auc` (`mode='max'`). Accuracy and
+`val_loss` kept whichever checkpoint had the lowest loss, which on a
+precision-critical task is not the one worth keeping. PR-AUC is
+threshold-independent, so it does not fight the threshold selection in step 5.
+
+Labels are **one-hot** and the loss is `CategoricalCrossentropy(label_smoothing=0.1)`:
+Keras implements smoothing only there, and the current score distribution
+(0.939 against 0.055) is exactly the over-confidence it tempers. Smoothing is
+applied inside the loss, so the reported metrics still see clean 0/1 targets.
+
 > **`activation='softmax'` is required and is not the default.** KerasHub ships
 > `activation=None`, which returns raw logits. Pairing that with
 > `from_logits=False` silently trains against a broken objective — the first
@@ -162,14 +199,33 @@ and no PyTorch is involved.
 
 ### 5. Threshold
 
+Two steps, in this order. They are not interchangeable.
+
 ```bash
-./backend/.venv/bin/python ml/select_threshold.py ml/artifacts/test_scores_backend.csv
+# SELECT on validation — this is where the operating point is chosen
+./backend/.venv/bin/python ml/score_split.py val
+./backend/.venv/bin/python ml/select_threshold.py ml/artifacts/val_scores_backend.csv
+
+# REPORT on test at the threshold that came back, changing nothing
+./backend/.venv/bin/python ml/score_split.py test
+./backend/.venv/bin/python ml/select_threshold.py \
+    ml/artifacts/test_scores_backend.csv --at-threshold <frozen>
 ```
 
-Scores were recomputed **through the backend's own inference code**, not taken
-from the notebook. Resizing with PIL instead of TensorFlow shifted individual
-scores by up to **0.46**, which would have silently invalidated the
-calibration.
+The threshold is a parameter fitted to data, like a weight. Fitting it on the
+test split and then reporting test metrics at that point measures the model on
+images the operating point was chosen to suit — the precision that comes back
+is an upper bound on itself rather than an independent estimate. Sweeping a
+file whose name contains `test` now prints a warning for exactly this reason.
+
+If the threshold is adjusted after seeing the test figures, the test split has
+been spent and the number is no longer independent. Change the model instead,
+or state plainly in Chapter 5 that the split was reused.
+
+Scores are recomputed **through the backend's own inference code** — the
+`score_images` entry point that serves S10 — not taken from the notebook.
+Resizing with PIL instead of TensorFlow shifted individual scores by up to
+**0.46**, which would have silently invalidated the calibration.
 
 ### 6. Backend
 
@@ -207,7 +263,19 @@ party.
 
 **Single evaluation run.** The test split was used once. Figures are not
 averaged over repeated runs with different seeds, so they carry the variance of
-a single training run.
+a single training run. Section 11 of the notebook and `aggregate_seeds.py`
+measure that spread; until they have been run, quote the confidence intervals
+`select_threshold.py` prints and say the seed variance is unmeasured.
+
+**The test split is small.** With 151 non-smoking images, the 95% confidence
+interval on precision is roughly ±0.03. Averaging over training seeds does not
+narrow that — only more labelled test data would. Both sources of uncertainty
+should be stated; neither alone answers "how much of this is luck".
+
+**The published threshold was selected on the test split.** Until the model is
+retrained and the validation-first procedure in section 5 is run end to end,
+the reported precision of 0.977 is an upper bound on itself. The procedure is
+implemented; the figures are not yet re-measured under it.
 
 ---
 
@@ -217,9 +285,18 @@ a single training run.
 |---|---|
 | `prepare_dataset.py` | De-duplicate, split, manifest |
 | `make_colab_bundle.py` | Resize + zip for upload |
-| `select_threshold.py` | Threshold sweep and recommendation |
+| `score_split.py` | Score a split through the backend's inference code |
+| `aggregate_seeds.py` | mean ± SD across training seeds |
+| `select_threshold.py` | Threshold selection (val) and reporting (test) |
 | `notebooks/finetune_vit.ipynb` | Training |
 | `data/manifest.csv` | The authoritative split (gitignored) |
 | `data/report.md` | Composition table for Chapter 5 |
 | `artifacts/vit-scope-v1.keras` | Trained model, ~982 MB (gitignored) |
-| `artifacts/test_scores_backend.csv` | Scores used to pick the threshold |
+| `artifacts/val_scores_backend.csv` | Scores the threshold is SELECTED on |
+| `artifacts/test_scores_backend.csv` | Scores the threshold is REPORTED on |
+
+
+| Model | Threshold chosen on | Precision | Recall | PR-AUC |
+|---|---|---|---|---|
+| vit-scope-v1 | test (biased) | 0.977 | 0.916 | not measured |
+| vit-scope-v2 | validation | 0.939 | 0.979 | 0.959 |
