@@ -12,8 +12,8 @@ threshold and accepts the report when at least one photograph clears it.
 |---|---|
 | Tooling (`prepare_dataset.py`, `select_threshold.py`, notebook) | ✅ |
 | Dataset assembled and split | ✅ 1,941 images |
-| Model fine-tuned | ✅ `vit-scope-v1` |
-| Threshold chosen | ⚠️ **0.70**, but selected on the test split — [re-select on validation](#5-threshold) |
+| Model fine-tuned | ✅ `vit-scope-v2` (supersedes `vit-scope-v1`) |
+| Threshold chosen | ✅ **0.63**, selected on validation and reported once on test |
 | Wired into the backend | ✅ real inference, stub removed |
 
 ---
@@ -34,22 +34,21 @@ validated on 290, and evaluated **once** on 293 held-out test images.
 Mean score for smoking images **0.939**, for non-smoking **0.055** — a
 separation of 0.884, meaning the model is decisive rather than hedging.
 
-> **These figures are from `vit-scope-v1` and will change.** Two reasons.
+> **These figures are from `vit-scope-v1` and are superseded.** They are kept
+> because the comparison is part of the argument, not because they are current.
 >
 > The 0.70 threshold was selected by sweeping these same test scores, so the
-> operating point was fitted to the images the result is claimed on. The
-> tooling for the correct procedure — select on validation, report on test — is
-> in place (`score_split.py`, and `select_threshold.py --at-threshold`).
+> operating point was fitted to the images the result is claimed on and 0.977
+> is an upper bound on itself rather than an independent estimate.
 >
 > The training recipe has also changed since this run: stronger augmentation,
 > precision/recall/PR-AUC metrics, PR-AUC early stopping and label smoothing
 > (step 4 below). `vit-scope-v1` predates all of it.
 >
-> The next run trains under the new recipe and re-measures under the correct
-> procedure. **Export it as `vit-scope-v2`** and bump `AI_MODEL_VERSION`, so
-> `AI_CLASSIFICATION.model_version` keeps historical confidence scores
-> interpretable. Expect precision to fall slightly once the threshold is chosen
-> on validation. That is the honest figure, not a regression.
+> **`vit-scope-v2` is the current model** — retrained under that recipe, with
+> its threshold selected on validation and reported once on test. It serves
+> S10 today. See [v1 against v2](#v1-against-v2) for the figures that belong in
+> Chapter 5.
 
 ### Threshold sweep
 
@@ -67,7 +66,14 @@ separation of 0.884, meaning the model is decisive rather than hedging.
 
 ---
 
-## Why 0.70 and not the best-F1 point
+## Why not the best-F1 point
+
+> This section is the **v1-era** analysis, and its numbers are v1's. The
+> reasoning is what matters and it still holds — it is now encoded in
+> `select_threshold.py`, which judges a threshold on the report-level error
+> rate rather than per-photo precision, and which selected v2's **0.63**
+> without needing the hand override described here. v2's own sweep is in
+> `artifacts/val_threshold_v2.txt`.
 
 `select_threshold.py` recommends **0.33** — the highest recall that still
 holds precision at 0.95, and close to the best-F1 point. **0.70 was chosen
@@ -230,9 +236,9 @@ Resizing with PIL instead of TensorFlow shifted individual scores by up to
 ### 6. Backend
 
 ```
-AI_MODEL_PATH=../ml/artifacts/vit-scope-v1.keras
-AI_MODEL_VERSION=vit-scope-v1
-AI_CONFIDENCE_THRESHOLD=0.70
+AI_MODEL_PATH=../ml/artifacts/vit-scope-v2.keras
+AI_MODEL_VERSION=vit-scope-v2
+AI_CONFIDENCE_THRESHOLD=0.6300
 AI_STUB_MODE=false
 ```
 
@@ -257,7 +263,7 @@ variance check and distance from a detection bounding box would make them real.
 
 **No human check.** FR12 was removed, so a false positive reaches enforcement
 uncorrected. The defence is that the threshold is tuned to minimise exactly
-that (3 false positives in 151 non-violations), and the dashboard is advisory —
+that (4 false positives in 151 non-violations at 0.63), and the dashboard is advisory —
 it informs patrol planning rather than triggering enforcement against a named
 party.
 
@@ -272,10 +278,10 @@ interval on precision is roughly ±0.03. Averaging over training seeds does not
 narrow that — only more labelled test data would. Both sources of uncertainty
 should be stated; neither alone answers "how much of this is luck".
 
-**The published threshold was selected on the test split.** Until the model is
-retrained and the validation-first procedure in section 5 is run end to end,
-the reported precision of 0.977 is an upper bound on itself. The procedure is
-implemented; the figures are not yet re-measured under it.
+**The threshold is now selected correctly — but only for v2.** `vit-scope-v2`
+has its operating point chosen on validation and reported once on test, so its
+0.970 is an independent estimate. The v1 figures kept above do not share that
+property and should never be quoted as current.
 
 ---
 
@@ -291,12 +297,40 @@ implemented; the figures are not yet re-measured under it.
 | `notebooks/finetune_vit.ipynb` | Training |
 | `data/manifest.csv` | The authoritative split (gitignored) |
 | `data/report.md` | Composition table for Chapter 5 |
-| `artifacts/vit-scope-v1.keras` | Trained model, ~982 MB (gitignored) |
+| `artifacts/vit-scope-v2.keras` | Trained model, ~1.0 GB (gitignored) |
 | `artifacts/val_scores_backend.csv` | Scores the threshold is SELECTED on |
 | `artifacts/test_scores_backend.csv` | Scores the threshold is REPORTED on |
 
 
-| Model | Threshold chosen on | Precision | Recall | PR-AUC |
-|---|---|---|---|---|
-| vit-scope-v1 | test (biased) | 0.977 | 0.916 | not measured |
-| vit-scope-v2 | validation | 0.939 | 0.979 | 0.959 |
+## v1 against v2
+
+Both rows are test-split figures on the same 293 images, so the comparison is
+like for like. What differs is where the threshold came from.
+
+| Model | Threshold | Chosen on | Precision | Recall | F1 | Confusion |
+|---|---|---|---|---|---|---|
+| vit-scope-v1 | 0.70 | test (biased) | 0.977 | 0.916 | 0.945 | TP 130 · FP 3 · FN 12 · TN 148 |
+| **vit-scope-v2** | **0.63** | **validation** | **0.970** | **0.923** | **0.946** | TP 131 · FP 4 · FN 11 · TN 147 |
+
+Source: `artifacts/test_threshold_v2.txt`, reproducible from
+`artifacts/test_scores_backend.csv`.
+
+**v2 holds v1's performance while being measured honestly** — 0.007 apart on
+both precision and recall, and the same F1 to three decimals. v1's 0.977 was
+fitted to the same images it was claimed on, so the true value was always below
+the printed one. The clearer win is on the validation split where the threshold
+was actually chosen: precision **0.992**, one false positive in 149, and
+**2.00%** of invalid three-photograph reports reaching enforcement against v1's
+5.84% (`artifacts/val_threshold_v2.txt`).
+
+> **Earlier revisions of this table gave v2 as 0.939 / 0.979.** Those are the
+> metrics at threshold **0.38**, selected on validation on 16 September under
+> the per-photo precision criterion. The criterion then changed to the
+> report-level error rate, the re-run recommended 0.63, and `backend/.env` was
+> updated — but this table was not. The 0.38 figures are superseded; do not
+> quote them.
+
+**PR-AUC is not recorded.** It is measured in the notebook's evaluation cell
+but was never written to a file in `artifacts/`, so it is deliberately absent
+here rather than guessed. Read it back from the notebook before quoting it in
+Chapter 5.
