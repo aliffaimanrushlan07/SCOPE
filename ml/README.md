@@ -15,6 +15,7 @@ threshold and accepts the report when at least one photograph clears it.
 | Model fine-tuned | ✅ `vit-scope-v2` (supersedes `vit-scope-v1`) |
 | Threshold chosen | ✅ **0.63**, selected on validation and reported once on test |
 | Wired into the backend | ✅ real inference, stub removed |
+| Seed variance measured | ✅ 3 seeds, precision 0.975 ± 0.008 |
 
 ---
 
@@ -267,11 +268,11 @@ that (4 false positives in 151 non-violations at 0.63), and the dashboard is adv
 it informs patrol planning rather than triggering enforcement against a named
 party.
 
-**Single evaluation run.** The test split was used once. Figures are not
-averaged over repeated runs with different seeds, so they carry the variance of
-a single training run. Section 11 of the notebook and `aggregate_seeds.py`
-measure that spread; until they have been run, quote the confidence intervals
-`select_threshold.py` prints and say the seed variance is unmeasured.
+**Seed variance is measured; the headline run is a single draw from it.**
+Three seeds give precision 0.975 ± 0.008 and recall 0.897 ± 0.011 — see
+[Seed variance](#seed-variance--what-one-run-cannot-tell-you). The deployed
+checkpoint's recall of 0.923 sits 2.4 SD above that mean, so it is a
+favourable draw and should not be quoted as though it were typical.
 
 **The test split is small.** With 151 non-smoking images, the 95% confidence
 interval on precision is roughly ±0.03. Averaging over training seeds does not
@@ -300,6 +301,10 @@ property and should never be quoted as current.
 | `artifacts/vit-scope-v2.keras` | Trained model, ~1.0 GB (gitignored) |
 | `artifacts/val_scores_backend.csv` | Scores the threshold is SELECTED on |
 | `artifacts/test_scores_backend.csv` | Scores the threshold is REPORTED on |
+| `artifacts/val_threshold_v2.txt` | v2 sweep and the selected 0.63 |
+| `artifacts/test_threshold_v2.txt` | v2 test metrics at the frozen 0.63 |
+| `artifacts/seed_study.txt` | mean ± SD across seeds 1–3 |
+| `artifacts/seeds/` | Per-seed val/test scores |
 
 
 ## v1 against v2
@@ -330,7 +335,65 @@ was actually chosen: precision **0.992**, one false positive in 149, and
 > updated — but this table was not. The 0.38 figures are superseded; do not
 > quote them.
 
-**PR-AUC is not recorded.** It is measured in the notebook's evaluation cell
-but was never written to a file in `artifacts/`, so it is deliberately absent
-here rather than guessed. Read it back from the notebook before quoting it in
-Chapter 5.
+**PR-AUC is 0.988 ± 0.001**, from the seed study below. The headline
+checkpoint's own PR-AUC was never written to a file, but with a standard
+deviation of 0.001 across three runs the spread is the better figure to quote.
+
+> An earlier revision of this table gave PR-AUC as 0.959. That is the **F1** at
+> threshold 0.38, carried into the wrong column along with the 0.38 precision
+> and recall. Nothing in this project has measured a PR-AUC of 0.959.
+
+---
+
+## Seed variance — what one run cannot tell you
+
+Every figure above comes from a single training run, so it carries that run's
+luck: the head starts random, images arrive in a random order, and the
+augmentation crops at random. `aggregate_seeds.py` puts three seeds through the
+**whole procedure independently** — threshold selected on that seed's own
+validation split, test metrics reported at that frozen threshold — so the
+spread answers the question actually being asked: what would have happened had
+the method been run once with a different seed.
+
+| Seed | Threshold | Precision | Recall | F1 | PR-AUC | FP | FN |
+|---|---|---|---|---|---|---|---|
+| 1 | 0.61 | 0.970 | 0.908 | 0.938 | 0.988 | 4 | 13 |
+| 2 | 0.69 | 0.984 | 0.887 | 0.933 | 0.988 | 2 | 16 |
+| 3 | 0.62 | 0.969 | 0.894 | 0.930 | 0.987 | 4 | 15 |
+| **Mean ± SD** | **0.640 ± 0.044** | **0.975 ± 0.008** | **0.897 ± 0.011** | **0.934 ± 0.004** | **0.988 ± 0.001** | | |
+
+Source: `artifacts/seed_study.txt`, reproducible from `artifacts/seeds/`.
+
+**Quote the spread, not the single run**, and say so:
+
+> "Across 3 training runs differing only in random seed, the classifier reached
+> precision 0.975 ± 0.008 and recall 0.897 ± 0.011 on the held-out test split,
+> each run using the threshold selected on its own validation split."
+
+### Where the headline run sits in that spread
+
+Honest reading, because it is not uniformly flattering:
+
+| | Headline `vit-scope-v2` | Across seeds | |
+|---|---|---|---|
+| Precision | 0.970 | 0.975 ± 0.008 | within 1 SD — unremarkable |
+| Recall | 0.923 | 0.897 ± 0.011 | **+2.4 SD — a favourable draw** |
+| Threshold | 0.63 | 0.640 ± 0.044 | within 1 SD — unremarkable |
+
+The deployed checkpoint drew **better-than-typical recall**. Typical recall for
+this recipe is 0.897, which is *below* v1's 0.916 — so quoting the spread is
+less flattering on recall than quoting the single run, and more defensible.
+Precision and the selected threshold are both ordinary, which is the
+reassuring part: the operating point is not an artefact of one lucky run.
+
+### Seeds are not the larger uncertainty
+
+| Source | Size on precision |
+|---|---|
+| Seed-to-seed SD | ±0.008 |
+| **Test-split sampling (95% CI, 151 negatives)** | **±0.032** |
+
+The test split dominates by roughly four times. **More seeds will not narrow
+the figure; more labelled test images would.** Report both, and say which
+dominates — a supervisor asking "how much of this is luck?" is asking about
+both, and quoting only the seed spread answers half the question.
