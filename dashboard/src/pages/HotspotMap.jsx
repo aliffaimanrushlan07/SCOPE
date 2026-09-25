@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Map, useMap } from '@vis.gl/react-google-maps'
 import { GoogleMapsOverlay } from '@deck.gl/google-maps'
 import { HeatmapLayer } from '@deck.gl/aggregation-layers'
+import { ScatterplotLayer, TextLayer } from '@deck.gl/layers'
 import * as api from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { ErrorState, Loading, TopBar } from '../components/ui'
@@ -15,6 +16,13 @@ const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
  * afresh, so the page keeps one palette and the density gradient inherits the
  * bands' monotonically decreasing lightness — still legible to a colour-blind
  * officer and still readable printed in black and white.
+ *
+ * The bands run fully saturated (bright yellow → orange → red-orange → deep
+ * red) so frequency reads at a glance. A pale stop is prepended below band 1:
+ * deck.gl interpolates across the whole range, and without it the thin edge of
+ * every blob lands on saturated yellow, which makes a single scattered report
+ * shout as loudly as a real cluster. The pale stop lets sparse areas fade out
+ * instead.
  */
 const rgb = (hex) => [
   parseInt(hex.slice(1, 3), 16),
@@ -22,7 +30,19 @@ const rgb = (hex) => [
   parseInt(hex.slice(5, 7), 16),
 ]
 
-const COLOR_RANGE = [[255, 241, 209], ...CLUSTER_BANDS.map((b) => rgb(b.fill))]
+const COLOR_RANGE = [[255, 247, 194], ...CLUSTER_BANDS.map((b) => rgb(b.fill))]
+
+/**
+ * The band a cluster's own count falls in. The API already sends `band`
+ * alongside `count` (see the D03 clusters endpoint), so this is only the
+ * fallback for a row that arrives without one — the band scale is defined in
+ * one place and the two must not disagree.
+ */
+const bandFor = (cluster) =>
+  CLUSTER_BANDS[(cluster.band ?? 1) - 1] ?? CLUSTER_BANDS[0]
+
+/** Width of the legend's swatch column — the largest swatch, so all four fit. */
+const SWATCH_COLUMN = Math.max(...CLUSTER_BANDS.map((b) => b.size)) / 2.6
 
 /**
  * D03 — Hotspot Map (FR09).
@@ -60,6 +80,24 @@ export default function HotspotMap() {
 
   const total = clusters.reduce((sum, c) => sum + c.count, 0)
 
+  /**
+   * Three layers, and the division of labour between them is the whole point.
+   *
+   * The heatmap shows WHERE reports concentrate. Its colour cannot be read as a
+   * count: it aggregates in screen space within `radiusPixels`, so the value
+   * behind a pixel is a sum over neighbouring clusters, and under SUM
+   * aggregation deck.gl rescales the colour domain by metres-per-pixel on every
+   * zoom. The same orange therefore means different totals at different zooms.
+   *
+   * The circles carry the counts. Each one is coloured, sized and labelled from
+   * the cluster's OWN count via the section 10.4 band, so colour there does map
+   * to a stated range — which is what the legend documents. Counts belong on
+   * this layer and nowhere else.
+   *
+   * Drawing order matters: the API returns clusters by count descending, so the
+   * largest circles are drawn first and smaller ones land on top of them rather
+   * than disappearing underneath.
+   */
   const layers = useMemo(
     () => [
       new HeatmapLayer({
@@ -72,6 +110,33 @@ export default function HotspotMap() {
         intensity: 1,
         threshold: 0.05,
         opacity: 0.75,
+        pickable: false,
+      }),
+      new ScatterplotLayer({
+        id: 'cluster-counts',
+        data: clusters,
+        getPosition: (c) => [c.longitude, c.latitude],
+        getFillColor: (c) => rgb(bandFor(c).fill),
+        getLineColor: [255, 255, 255],
+        getRadius: (c) => bandFor(c).size / 2,
+        radiusUnits: 'pixels',
+        stroked: true,
+        lineWidthUnits: 'pixels',
+        getLineWidth: 1.5,
+        opacity: 0.95,
+        pickable: false,
+      }),
+      new TextLayer({
+        id: 'cluster-numerals',
+        data: clusters,
+        getPosition: (c) => [c.longitude, c.latitude],
+        getText: (c) => String(c.count),
+        getColor: (c) => rgb(bandFor(c).ink),
+        getSize: (c) => (bandFor(c).size >= 58 ? 16 : 13),
+        sizeUnits: 'pixels',
+        fontWeight: 700,
+        getTextAnchor: 'middle',
+        getAlignmentBaseline: 'center',
         pickable: false,
       }),
     ],
@@ -218,9 +283,17 @@ function DeckGLOverlay({ layers }) {
   return null
 }
 
+/**
+ * The legend documents what the CIRCLES mean, because they are the only thing
+ * on this map whose colour maps to a stated number of reports. It deliberately
+ * does not put counts against the heatmap gradient: that colour is relative and
+ * zoom-dependent (see the layer comments), so a numeric key there would be
+ * wrong. The glow gets one honest line of prose instead.
+ *
+ * Swatch diameters are the band sizes scaled down, so the legend shows the
+ * size encoding too — the same redundancy the map relies on.
+ */
 function Legend() {
-  const ramp = COLOR_RANGE.map((c) => `rgb(${c.join(',')})`).join(', ')
-
   return (
     <div
       className="card"
@@ -229,26 +302,50 @@ function Legend() {
         right: 16,
         bottom: 26,
         zIndex: 1000,
-        padding: 12,
+        padding: '12px 14px',
         fontSize: 12.5,
+        maxWidth: 210,
       }}
     >
-      <div style={{ fontWeight: 650, marginBottom: 8 }}>Report density</div>
-      <div
-        style={{
-          width: 148,
-          height: 12,
-          borderRadius: 6,
-          background: `linear-gradient(to right, ${ramp})`,
-          border: '1px solid var(--line)',
-        }}
-      />
+      <div style={{ fontWeight: 650, marginBottom: 9 }}>Reports per cluster</div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {CLUSTER_BANDS.map((b) => (
+          <div key={b.band} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            {/* Fixed-width column so the swatches stay centred on one axis and
+                the labels line up, despite each swatch being a different size. */}
+            <span
+              aria-hidden="true"
+              style={{
+                flex: `0 0 ${SWATCH_COLUMN}px`,
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <span
+                style={{
+                  width: b.size / 2.6,
+                  height: b.size / 2.6,
+                  borderRadius: '50%',
+                  background: b.fill,
+                  border: '1.5px solid var(--white)',
+                  boxShadow: '0 0 0 1px var(--line)',
+                }}
+              />
+            </span>
+            <span>
+              {b.label} {b.band === 1 ? 'reports' : ''}
+            </span>
+          </div>
+        ))}
+      </div>
+
       <div
         className="muted"
-        style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}
+        style={{ marginTop: 10, paddingTop: 9, borderTop: '1px solid var(--line)', lineHeight: 1.4 }}
       >
-        <span>Sparse</span>
-        <span>Dense</span>
+        The glow behind the circles shows where reports concentrate. Its shade is
+        relative to the current view, so read counts from the circles.
       </div>
     </div>
   )
