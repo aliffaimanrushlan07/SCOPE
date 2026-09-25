@@ -28,14 +28,23 @@ export const PIN_ICON_ANCHOR = { x: 13, y: 38 }
 /**
  * D03 cluster scale — section 10.4.
  *
- * Count is encoded THREE ways at once: diameter, fill colour and the numeral
- * inside. The redundancy is deliberate — it keeps the map readable for
- * colour-blind officers and survives black-and-white printing of the report,
- * because lightness decreases monotonically across the four bands.
+ * A bright thermal ramp: saturated yellow through orange and red-orange to a
+ * deep red at the top. The high saturation is the point — an officer scanning
+ * the map should see where the reports concentrate without reading the legend
+ * first.
+ *
+ * Count is still encoded THREE ways at once: diameter, fill colour and the
+ * numeral inside. The redundancy keeps the map readable for colour-blind
+ * officers and survives black-and-white printing of the report, because
+ * relative luminance still decreases monotonically across the four bands
+ * (0.75 → 0.39 → 0.24 → 0.12) even though every step is now fully saturated.
+ *
+ * Inks are dark on bands 1–3 and white on band 4; each clears WCAG AA for
+ * normal text on its own fill (9.9:1, 6.9:1, 5.1:1, 6.2:1).
  */
 export const CLUSTER_BANDS = [
-  { band: 1, label: '1 – 4', fill: '#FFD166', ink: '#3A2E12', size: 36 },
-  { band: 2, label: '5 – 9', fill: '#F4A259', ink: '#33220F', size: 46 },
-  { band: 3, label: '10 – 19', fill: '#E76F51', ink: '#FFFFFF', size: 58 },
-  { band: 4, label: '20 +', fill: '#B33F2B', ink: '#FFFFFF', size: 72 },
+  { band: 1, label: '1 – 4', fill: '#FFE01B', ink: '#3D2F05', size: 36 },
+  { band: 2, label: '5 – 9', fill: '#FF8A00', ink: '#331A00', size: 46 },
+  { band: 3, label: '10 – 19', fill: '#FF3B14', ink: '#2B0C02', size: 58 },
+  { band: 4, label: '20 +', fill: '#C1121F', ink: '#FFFFFF', size: 72 },
 ]

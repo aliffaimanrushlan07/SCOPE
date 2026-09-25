@@ -18,12 +18,12 @@
  *
  * On the national palette: chrome and brand are derived from the Jalur
  * Gemilang blue. The band scale below was NOT recoloured to match, because it
- * already runs flag yellow to flag red — band 1 (#ffd166) sits 6° off
- * #ffcc00 and band 4 (#b33f2b) 9° off #cc0001, at near-identical relative
- * luminance. It arrived there from the colour-blind constraint, not from the
- * flag, and it is left exactly as section 10.4 documents it. Flag yellow is
- * therefore reserved to the data region and is deliberately absent from the
- * chrome, so yellow never means two things on one screen.
+ * already runs flag yellow to flag red — band 1 (#ffe01b) sits 4° off
+ * #ffcc00 and band 4 (#c1121f) 4° off #cc0001. Both ends are held at full
+ * saturation, so the scale reads as a bright thermal ramp on the map while
+ * staying recognisably the flag. Flag yellow is therefore reserved to the data
+ * region and is deliberately absent from the chrome, so yellow never means two
+ * things on one screen.
  */
 
 :root {
@@ -68,13 +68,20 @@
      the literal is repeated in Overview.jsx — keep the two in step. */
   --chart-bar: #3d68c9;
 
-  /* D03 cluster scale, section 10.4 */
-  --band-1: #ffd166;
-  --band-2: #f4a259;
-  --band-3: #e76f51;
-  --band-4: #b33f2b;
-  --band-1-ink: #3a2e12;
-  --band-2-ink: #33220f;
+  /* D03 cluster scale, section 10.4. Fully saturated yellow → orange →
+     red-orange → deep red. Relative luminance still falls monotonically
+     (0.75, 0.39, 0.24, 0.12), so the scale survives greyscale printing and
+     stays ordered for a colour-blind reader. Inks clear WCAG AA for normal
+     text on their own fill; band 4 takes white instead. Keep these in step
+     with CLUSTER_BANDS in components/clusterBands.js, which is what the map
+     actually draws from. */
+  --band-1: #ffe01b;
+  --band-2: #ff8a00;
+  --band-3: #ff3b14;
+  --band-4: #c1121f;
+  --band-1-ink: #3d2f05;
+  --band-2-ink: #331a00;
+  --band-3-ink: #2b0c02;
 
   --radius: 10px;
   --shadow: 0 1px 2px rgba(22, 25, 27, 0.06), 0 2px 8px rgba(22, 25, 27, 0.04);
