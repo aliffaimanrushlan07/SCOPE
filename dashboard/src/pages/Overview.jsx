@@ -161,7 +161,7 @@ export default function Overview() {
                       dataKey="count"
                       /* --chart-bar. Inlined because recharts writes fill as
                          an SVG attribute, which does not resolve var(). */
-                      fill="#3d68c9"
+                      fill="#0d9488"
                       radius={[3, 3, 0, 0]}
                       isAnimationActive={false}
                       maxBarSize={64}
