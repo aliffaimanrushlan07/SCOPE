@@ -230,10 +230,10 @@ CREATE INDEX idx_admin_activity_log_activity_at ON admin_activity_log (activity_
 -- ---------------------------------------------------------------------
 -- Table 4.9 — INFOGRAPHIC
 -- The three fixed awareness slots managed at D06 and rendered in the
--- mobile Home carousel (S02) and Awareness Hub (S04).
+-- mobile Awareness Hub (S04).
 -- The primary key is a fixed slot number rather than a generated
--- identifier, enforcing the three-slot constraint the mobile layouts
--- depend upon.
+-- identifier, enforcing the three-slot constraint that screen's layout
+-- depends upon.
 -- ---------------------------------------------------------------------
 CREATE TABLE infographic (
     infographic_id  SMALLINT     PRIMARY KEY,
@@ -248,11 +248,11 @@ CREATE TABLE infographic (
 );
 
 COMMENT ON TABLE infographic IS
-    'Three fixed slots. D06 replaces image and title in place; slots cannot be added or deleted because S02 renders exactly three carousel dots and S04 exactly three buttons.';
+    'Three fixed slots. D06 replaces image and title in place; slots cannot be added or deleted because S04 renders exactly three buttons, with no empty state for a missing slot and no overflow state for a fourth.';
 
--- D06 offers replace-in-place only. Deleting a slot would break S02 and
--- S04, which have no empty state. Blocking DELETE here means the
--- constraint holds even against direct database access.
+-- D06 offers replace-in-place only. Deleting a slot would break S04,
+-- which has no empty state for a missing slot. Blocking DELETE here means
+-- the constraint holds even against direct database access.
 CREATE OR REPLACE FUNCTION infographic_block_delete() RETURNS trigger AS $$
 BEGIN
     RAISE EXCEPTION

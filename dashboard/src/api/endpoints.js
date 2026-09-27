@@ -88,8 +88,8 @@ export const listInfographics = () =>
   client.get('/admin/infographics').then((r) => r.data)
 
 /** Replace-in-place only. There is no create and no delete: the mobile
- *  carousel renders exactly three slides and the Awareness Hub three buttons,
- *  neither of which has an empty or overflow state. */
+ *  Awareness Hub renders exactly three buttons, one per slot, with no empty
+ *  state for a missing slot and no overflow state for a fourth. */
 export const updateInfographic = (slot, { title, image }) => {
   const form = new FormData()
   form.append('title', title)

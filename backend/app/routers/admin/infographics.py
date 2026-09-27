@@ -1,9 +1,9 @@
 """D06 — infographic management.
 
 Three fixed slots, replace-in-place only. There is no POST and no DELETE:
-the mobile Home carousel (S02) renders exactly three pagination dots and the
-Awareness Hub (S04) exactly three buttons, neither of which has an empty or
-overflow state. Adding a fourth slot or removing one would break both screens.
+the Awareness Hub (S04) renders exactly three buttons, one per slot, and has
+no empty state for a missing slot and no overflow state for a fourth. Adding
+a slot or removing one would break that screen.
 
 The constraint is enforced in three places — the route surface here, the
 primary-key CHECK, and a delete-blocking trigger — so it holds even against

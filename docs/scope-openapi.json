@@ -211,7 +211,7 @@
         "tags": [
           "Public content"
         ],
-        "summary": "The three awareness slots (S02 carousel, S04 hub)",
+        "summary": "The three awareness slots (S04 hub)",
         "operationId": "list_infographics_api_v1_infographics_get",
         "responses": {
           "200": {

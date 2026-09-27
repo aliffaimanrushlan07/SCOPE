@@ -34,9 +34,9 @@ INSERT INTO admin_user (email, password_hash, full_name, organisation, role) VAL
 -- ---------------------------------------------------------------------
 -- Infographic slots (Table 4.9)
 --
--- All three rows must exist from first boot. The mobile Home carousel
--- (S02) renders exactly three slides and the Awareness Hub (S04) exactly
--- three buttons; neither screen has an empty state for a missing slot.
+-- All three rows must exist from first boot. The Awareness Hub (S04)
+-- renders exactly three buttons, one per slot; that screen has no empty
+-- state for a missing slot and no overflow state for a fourth.
 --
 -- Titles match the three topics specified in
 -- SCOPE-System-Flow-Revised.md section S02.

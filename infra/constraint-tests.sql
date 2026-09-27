@@ -108,7 +108,7 @@ VALUES (4, 'A fourth slot', 'infographics/slot-4.png');
 -- ---------------------------------------------------------------------
 \echo ''
 \echo '=== TEST 10 — EXPECT FAIL: deleting an infographic slot ==='
-\echo '    S02 renders three carousel dots and S04 three buttons; neither has an empty state.'
+\echo '    S04 renders exactly three buttons and has no empty state for a missing slot.'
 -- ---------------------------------------------------------------------
 DELETE FROM infographic WHERE infographic_id = 3;
 
