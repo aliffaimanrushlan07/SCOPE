@@ -167,15 +167,17 @@ the crop range in the table above.
 
 | File | What it is |
 | --- | --- |
-| `home-poster.webp` | The poster. 1200 x 630, four frames at 350 ms, looping indefinitely. The motion is a camera reticle and a smoke plume in a 342 x 126 patch at +666,+78 — inside the safe zone. |
+| `home-poster.webp` | The poster. 1200 x 630, four frames at 350 ms, looping indefinitely. The motion is a camera reticle, a smoke plume and dots travelling along the flow arrows, in a 660 x 372 patch at +348,+120 — inside the safe zone. |
 | `home-poster-still.png` | Its first frame, flattened to PNG8. Shown when the device asks for reduced motion. |
 
 Pixel-art diner scene: a chalkboard reading "Nampak orang merokok? / Ambil
 gambar & lapor. / Snap it & report it.", a seated smoker under a camera
-reticle, and an officer photographing them. Both worst-case crops — 1.726 and
-2.095 — keep the whole chalkboard, all four lines and both figures.
+reticle, an officer photographing them, and across the floor below, the
+report's path drawn as phone to verified shield to officer. Both worst-case
+crops — 1.726 and 2.095 — keep the whole chalkboard, all four lines, both
+figures and the entire flow row.
 
-It departs from the prompt above in three ways, all deliberate choices by
+It departs from the prompt above in two ways, both deliberate choices by
 whoever commissioned it rather than mistakes:
 
 - **It animates.** The prompt asked for a static poster. This is why
@@ -185,8 +187,6 @@ whoever commissioned it rather than mistakes:
   bilingual Malay and English. The smallest line measures about 40 px on the
   canvas against the 46 px floor the prompt sets, so it renders at roughly
   12 logical px on a 390 dp phone: legible, but the tightest thing on Home.
-- **Roughly the bottom 40% is empty floor**, so the composition sits high in
-  the 190 px band.
 
 Pixel art is arguably more on-brand than the prompt's flat-geometric brief
 suggests — the SCOPE mark is itself pixel art on a 32-unit grid, as
