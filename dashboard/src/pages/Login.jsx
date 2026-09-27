@@ -56,7 +56,7 @@ export default function Login() {
             fontSize: 19,
           }}
         >
-          <img src={scopeMark} alt="" aria-hidden="true" width="26" height="26" />
+          <img src={scopeMark} alt="" aria-hidden="true" width="34" height="34" />
           SCOPE
         </div>
 
