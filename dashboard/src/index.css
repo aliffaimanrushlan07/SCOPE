@@ -3,7 +3,7 @@
  *
  * Two colour zones, and the split is the whole rule.
  *
- * CHROME (sidebar) is deep teal-navy. It frames the work but never encodes
+ * CHROME (sidebar) is deep teal. It frames the work but never encodes
  * anything, so an officer scanning the map for eight hours has a dark, quiet
  * edge to rest against rather than a second field of white.
  *
@@ -13,17 +13,23 @@
  * monotonically across that scale, which is what keeps the map readable for
  * colour-blind officers and survives black-and-white printing of the report.
  *
- * Brand blue appears only on primary buttons, focus rings and the active nav
+ * Brand teal appears only on primary buttons, focus rings and the active nav
  * item — never on a chart, never on the map.
  *
- * On the national palette: chrome and brand are derived from the Jalur
- * Gemilang blue. The band scale below was NOT recoloured to match, because it
- * already runs flag yellow to flag red — band 1 (#ffe01b) sits 4° off
- * #ffcc00 and band 4 (#c1121f) 4° off #cc0001. Both ends are held at full
- * saturation, so the scale reads as a bright thermal ramp on the map while
- * staying recognisably the flag. Flag yellow is therefore reserved to the data
- * region and is deliberately absent from the chrome, so yellow never means two
- * things on one screen.
+ * On the palette: chrome and brand are taken from the SCOPE mark, whose teals
+ * run #0B2F2C through #2DD4BF. They were previously derived from the Jalur
+ * Gemilang blue; that reading no longer holds, because the mark the product
+ * ships under is teal and a blue chrome around a teal logo read as two
+ * different systems on one screen. The flag argument is therefore dropped
+ * rather than quietly reinterpreted — this palette is brand-derived, not
+ * national.
+ *
+ * The band scale below is unchanged and is still NOT recoloured to match. It
+ * runs flag yellow to flag red — band 1 (#ffe01b) sits 4° off #ffcc00 and
+ * band 4 (#c1121f) 4° off #cc0001 — held at full saturation so it reads as a
+ * bright thermal ramp on the map. Teal chrome makes that separation cleaner
+ * than blue chrome did: warm hues now mean magnitude and cool hues mean
+ * furniture, with nothing shared between the two.
  */
 
 :root {
@@ -37,36 +43,45 @@
   --white: #ffffff;
 
   /* Brand — primary buttons, focus rings, active nav. Identical to the
-     mobile app's ScopeTheme.primary. Derived from the Jalur Gemilang blue
-     (#010066, hue 241°) held at hue 222° so it stays recognisably the flag
-     while dropping the saturation that makes the raw value unusable at size. */
-  --brand: #1a3d8f;
-  --brand-dark: #132e6e;
+     mobile app's ScopeTheme.primary. This is the mark's #115E59, not its
+     dominant #0D9488: that lighter teal carries white label text at only
+     3.7:1 and fails WCAG AA, so the logo colour cannot be the button colour.
+     #115E59 clears AAA at 7.6:1. */
+  --brand: #115e59;
+  --brand-dark: #0b4f4a;
 
   /* Chrome — the sidebar only. Identical to the app's ScopeTheme.chrome.
-     Same flag blue, taken darker for a full-height surface. Fully saturated
-     dark blue fringes at text edges over a long shift, so saturation sits at
-     ~75% rather than the flag's 100%.
-     Contrast on this ground: --chrome-ink 13.6:1, --chrome-muted 7.5:1,
-     --chrome-active 7.3:1. All clear WCAG AA; the first two clear AAA. */
-  --chrome: #0b1f4d;
+     The mark's darkest teal, which is already the outline colour drawn round
+     the magnifier, so the logo sits on the sidebar without a seam.
+     Contrast on this ground: --chrome-ink 12.8:1, --chrome-muted 7.8:1,
+     --chrome-active 9.7:1. All three clear WCAG AAA.
+     --chrome-active is a brighter, more saturated teal rather than a lighter
+     tint of --chrome-muted. Under the old blue chrome the active and muted
+     inks sat 1.03:1 apart and were told apart almost entirely by hue, which
+     is the one channel a colour-blind officer may not have; they now differ
+     in luminance too, at 1.25:1. */
+  --chrome: #0b2f2c;
   --chrome-hover: rgba(255, 255, 255, 0.07);
   --chrome-line: rgba(255, 255, 255, 0.13);
-  --chrome-ink: #e8edf7;
-  --chrome-muted: #a3b2d4;
-  --chrome-active: #8fb0ee;
+  --chrome-ink: #e6f4f1;
+  --chrome-muted: #a6c5bf;
+  --chrome-active: #5eead4;
 
   --danger: #b3261e;
 
-  /* Bar fill for the D02 time series. The brand hue two lightness steps up:
-     related to the brand, but far enough off the button colour (1.9:1) that
-     an inert bar does not read as something to click. Single-series, so hue
-     encodes nothing here — height already carries the whole magnitude. The
-     band scale below is deliberately NOT used: those hues mean density on
-     D03, and reusing them would claim a severity the count does not have.
+  /* Bar fill for the D02 time series. The mark's dominant #0D9488 — related
+     to the brand, but far enough off the button colour (2.0:1) that an inert
+     bar does not read as something to click. Single-series, so hue encodes
+     nothing here — height already carries the whole magnitude. The band scale
+     below is deliberately NOT used: those hues mean density on D03, and
+     reusing them would claim a severity the count does not have.
+     Against --surface this sits at 3.5:1 rather than the 4.8:1 the old blue
+     bar had. Teal cannot be both a clear step up from the button and as dark
+     as that blue was; the bar is a filled shape with an axis beside it, not
+     text, so the lower figure is the better trade.
      Recharts sets fill as an SVG attribute, where var() does not resolve, so
      the literal is repeated in Overview.jsx — keep the two in step. */
-  --chart-bar: #3d68c9;
+  --chart-bar: #0d9488;
 
   /* D03 cluster scale, section 10.4. Fully saturated yellow → orange →
      red-orange → deep red. Relative luminance still falls monotonically

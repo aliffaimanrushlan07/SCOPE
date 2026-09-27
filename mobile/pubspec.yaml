@@ -77,13 +77,13 @@ flutter_launcher_icons:
 # native splash and S01. Regenerate with:
 #   dart run flutter_native_splash:create
 flutter_native_splash:
-  color: "#0B1F4D"
+  color: "#0B2F2C"
   image: assets/branding/scope_stacked_white.png
   android: true
   ios: true
   android_12:
-    color: "#0B1F4D"
-    icon_background_color: "#0B1F4D"
+    color: "#0B2F2C"
+    icon_background_color: "#0B2F2C"
     image: assets/branding/app_icon_foreground.png
 
 # For information on the generic Dart part of this file, see the

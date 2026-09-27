@@ -9,17 +9,19 @@ import 'package:flutter/material.dart';
 class ScopeTheme {
   ScopeTheme._();
 
-  /// Brand blue. Identical to the dashboard's `--brand`, so a screenshot of
+  /// Brand teal. Identical to the dashboard's `--brand`, so a screenshot of
   /// the app and a screenshot of the dashboard read as one system.
   ///
-  /// Derived from the Jalur Gemilang blue (#010066) but held at ~70%
-  /// saturation: the flag value is meant for fabric, and at full saturation
-  /// it fringes badly behind white label text.
-  static const Color primary = Color(0xFF1A3D8F);
+  /// Taken from the SCOPE mark, but deliberately not the mark's dominant
+  /// #0D9488: that teal carries white label text at only 3.7:1 and fails
+  /// WCAG AA, so the logo colour cannot be the button colour. This one clears
+  /// AAA at 7.6:1, which is what the "high contrast" note above is about.
+  static const Color primary = Color(0xFF115E59);
 
-  /// The same flag blue taken darker, used only for full-bleed chrome — the
-  /// splash here, the sidebar on the dashboard. Shared with `--chrome`.
-  static const Color chrome = Color(0xFF0B1F4D);
+  /// The mark's darkest teal — already the outline drawn round the magnifier —
+  /// used only for full-bleed chrome: the splash here, the sidebar on the
+  /// dashboard. Shared with `--chrome`.
+  static const Color chrome = Color(0xFF0B2F2C);
 
   static const Color danger = Color(0xFFB3261E);
   static const Color success = Color(0xFF2E7D32);
