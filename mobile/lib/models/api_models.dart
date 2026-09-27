@@ -101,7 +101,7 @@ class SubmissionResult {
       );
 }
 
-/// One of the three fixed awareness slots (S02 carousel, S04 hub).
+/// One of the three fixed awareness slots (S04 hub).
 class Infographic {
   const Infographic({
     required this.id,

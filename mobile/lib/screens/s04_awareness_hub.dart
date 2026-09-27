@@ -9,8 +9,10 @@ import '../widgets/infographic_viewer.dart';
 /// S04 — Awareness Hub.
 ///
 /// Three buttons, one per infographic slot, each with its topic and a
-/// thumbnail. Tapping opens the same floating viewer (S05) the Home carousel
-/// uses.
+/// thumbnail. Tapping opens the floating viewer (S05).
+///
+/// This is now the only way into the infographics: Home used to preview
+/// them in a carousel and carries a fixed poster instead.
 ///
 /// The count is fixed at three by the data model — the D06 slots are keyed 1-3
 /// and the database rejects a fourth — so this screen needs no overflow state.
