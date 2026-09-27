@@ -1,42 +1,17 @@
-import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
-import '../models/api_models.dart';
 import '../router.dart';
-import '../services/scope_api.dart';
-import '../widgets/infographic_viewer.dart';
 import '../widgets/scope_logo.dart';
 
 /// S02 — Home.
 ///
 /// Layout order is fixed by the specification, top to bottom: logo header,
-/// infographic carousel, three feature buttons, then the MAKE A REPORT button
-/// anchored near the bottom and visually dominant.
-class HomeScreen extends StatefulWidget {
+/// poster, three feature buttons, then the MAKE A REPORT button anchored near
+/// the bottom and visually dominant.
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  late Future<List<Infographic>> _infographics;
-  int _carouselIndex = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _infographics = context.read<ScopeApi>().infographics();
-  }
-
-  void _reload() {
-    setState(() {
-      _infographics = context.read<ScopeApi>().infographics();
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildCarousel(),
+                    const _HomePoster(),
                     const SizedBox(height: Gap.lg),
                     _FeatureButton(
                       icon: Icons.menu_book_outlined,
@@ -79,75 +54,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildCarousel() {
-    return FutureBuilder<List<Infographic>>(
-      future: _infographics,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _CarouselPlaceholder(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError || (snapshot.data?.isEmpty ?? true)) {
-          return _CarouselPlaceholder(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.wifi_off_rounded, color: ScopeTheme.inkMuted),
-                const SizedBox(height: Gap.sm),
-                const Text(
-                  'Awareness content unavailable',
-                  style: TextStyle(color: ScopeTheme.inkMuted),
-                ),
-                TextButton(onPressed: _reload, child: const Text('Retry')),
-              ],
-            ),
-          );
-        }
-
-        final items = snapshot.data!;
-        return Column(
-          children: [
-            CarouselSlider.builder(
-              itemCount: items.length,
-              options: CarouselOptions(
-                height: 190,
-                viewportFraction: 1,
-                autoPlay: true,
-                autoPlayInterval: const Duration(seconds: 6),
-                onPageChanged: (index, _) =>
-                    setState(() => _carouselIndex = index),
-              ),
-              itemBuilder: (context, index, _) => _CarouselSlide(
-                infographic: items[index],
-                // Tapping a slide opens the same viewer the Awareness Hub uses.
-                onTap: () => showInfographicViewer(context, items[index]),
-              ),
-            ),
-            const SizedBox(height: Gap.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                items.length,
-                (index) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: _carouselIndex == index ? 20 : 7,
-                  height: 7,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
-                    color: _carouselIndex == index
-                        ? ScopeTheme.primary
-                        : ScopeTheme.line,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -263,86 +169,46 @@ Future<void> _showNavigationMenu(BuildContext context) {
   );
 }
 
-class _CarouselSlide extends StatelessWidget {
-  const _CarouselSlide({required this.infographic, required this.onTap});
-
-  final Infographic infographic;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: ScopeTheme.surfaceMuted,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.network(
-              ScopeApi.mediaUrl(infographic.imagePath),
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Container(
-                color: ScopeTheme.primary.withValues(alpha: 0.08),
-                child: const Center(
-                  child: Icon(
-                    Icons.image_outlined,
-                    size: 44,
-                    color: ScopeTheme.inkMuted,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(Gap.md),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.72),
-                    ],
-                  ),
-                ),
-                child: Text(
-                  infographic.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CarouselPlaceholder extends StatelessWidget {
-  const _CarouselPlaceholder({required this.child});
-
-  final Widget child;
+/// The Home poster.
+///
+/// Standing artwork, not a preview: the three awareness infographics this
+/// replaced are still one tap away in the Awareness Hub (S04), so Home no
+/// longer needs to page through them. Being a bundled asset it has no
+/// loading, error or offline state, which is the point — Home is the screen
+/// someone opens with a violation in front of them.
+///
+/// 190 is the height the carousel occupied, kept so everything below it lands
+/// where it did. The artwork is authored at 1200 × 630; see
+/// docs/home-poster-prompt.md for why that aspect and what has to stay inside
+/// its safe zone, because [BoxFit.cover] crops the sides on a narrow phone and
+/// the top and bottom on a wide one.
+class _HomePoster extends StatelessWidget {
+  const _HomePoster();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 190,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: ScopeTheme.surfaceMuted,
+    // The poster is an animated WebP: a camera reticle and a smoke plume loop
+    // for as long as Home is on screen, which is the whole time for most of a
+    // session. Motion that starts by itself and never stops needs a way out
+    // (WCAG 2.2.2), and the platform already offers one, so take the still
+    // first frame when the user has asked for less motion.
+    final asset = MediaQuery.disableAnimationsOf(context)
+        ? 'assets/poster/home-poster-still.png'
+        : 'assets/poster/home-poster.webp';
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 190,
+        child: Image.asset(
+          asset,
+          fit: BoxFit.cover,
+          // The poster's wording lives in the artwork, where a screen reader
+          // cannot reach it.
+          semanticLabel: 'Poster: Nampak orang merokok? Ambil gambar dan '
+              'lapor. See someone smoking? Snap it and report it.',
+        ),
       ),
-      child: Center(child: child),
     );
   }
 }

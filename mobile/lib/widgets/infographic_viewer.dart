@@ -7,9 +7,8 @@ import '../services/scope_api.dart';
 
 /// S05 — Infographic Viewer.
 ///
-/// A floating overlay over a dimmed backdrop, not a route: it returns to
-/// whichever screen opened it, the Home carousel (S02) or the Awareness Hub
-/// (S04).
+/// A floating overlay over a dimmed backdrop, not a route: it returns to the
+/// Awareness Hub (S04) that opened it.
 ///
 /// Pinch-to-zoom and pan come from PhotoView, and they are not decoration —
 /// an infographic legible on A4 is not legible on a phone without them.

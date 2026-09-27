@@ -40,10 +40,10 @@ export default function Infographics() {
 
       <div className="page">
         <Notice title="Three fixed slots">
-          These three infographics appear in the mobile app's home carousel and
-          Awareness Hub. You can replace the image and edit the title of each
-          slot, but slots cannot be added or deleted — both mobile screens are
-          built around exactly three.
+          These three infographics appear in the mobile app's Awareness Hub.
+          You can replace the image and edit the title of each slot, but slots
+          cannot be added or deleted — that screen is built around exactly
+          three.
         </Notice>
 
         {loading ? (
