@@ -30,7 +30,7 @@ export default function Layout() {
     <div className="shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <img src={scopeMarkWhite} alt="" aria-hidden="true" width="22" height="22" />
+          <img src={scopeMarkWhite} alt="" aria-hidden="true" width="28" height="28" />
           <span>SCOPE</span>
         </div>
 
