@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
 import '../router.dart';
+import '../services/backend_status.dart';
 import '../widgets/scope_logo.dart';
 
 /// S02 — Home.
@@ -20,6 +22,7 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           children: [
             const _HomeHeader(),
+            const _OfflineBanner(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: Gap.md),
@@ -73,6 +76,83 @@ class HomeScreen extends StatelessWidget {
               letterSpacing: 0.5,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown when the backend failed its last health check, whether at launch
+/// (S01) or on a retry here.
+///
+/// Home itself is bundled and works offline, so this informs rather than
+/// blocks. Settings is offered because the usual cause during a demonstration
+/// is a changed hotspot address, and the connection settings are otherwise
+/// two screens deep behind About.
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner();
+
+  Future<void> _openSettings(BuildContext context) async {
+    final status = context.read<BackendStatus>();
+    await context.push(Routes.settings);
+    // The address may have changed; check it rather than keep a stale warning.
+    await status.check();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = context.watch<BackendStatus>();
+    if (!status.isUnreachable) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Gap.md, 0, Gap.md, Gap.md),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(Gap.md, Gap.md, Gap.sm, Gap.xs),
+        decoration: BoxDecoration(
+          color: ScopeTheme.warning.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ScopeTheme.warning.withValues(alpha: 0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.cloud_off_rounded, color: ScopeTheme.warning),
+                const SizedBox(width: Gap.sm),
+                Expanded(
+                  child: Text(
+                    "Can't reach the SCOPE server. Reports can't be sent and "
+                    "online content won't load until it's back.",
+                    style: const TextStyle(
+                      color: ScopeTheme.ink,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => _openSettings(context),
+                  child: const Text('Settings'),
+                ),
+                TextButton(
+                  onPressed: status.isChecking ? null : status.check,
+                  child: status.isChecking
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Retry'),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

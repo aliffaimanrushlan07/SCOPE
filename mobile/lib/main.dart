@@ -6,6 +6,7 @@ import 'core/settings.dart';
 import 'core/theme.dart';
 import 'models/report_draft.dart';
 import 'router.dart';
+import 'services/backend_status.dart';
 import 'services/scope_api.dart';
 
 Future<void> main() async {
@@ -34,6 +35,10 @@ class ScopeApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<ScopeApi>(create: (_) => ScopeApi()),
+        // Written by S01's launch check, read by Home's offline banner.
+        ChangeNotifierProvider<BackendStatus>(
+          create: (context) => BackendStatus(context.read<ScopeApi>()),
+        ),
         // Already loaded in main, and also reachable statically for callers
         // without a BuildContext. Provided here so the settings screen and the
         // About entry rebuild when the address changes.
