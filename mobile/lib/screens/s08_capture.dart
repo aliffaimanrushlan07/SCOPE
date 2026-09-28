@@ -24,6 +24,11 @@ import '../widgets/photo_review_sheet.dart';
 /// report an evidentiary link between the photograph and the place, and lets
 /// the backend flag a report whose tagged location is far from where the
 /// photograph was taken. It is best-effort: a missing fix never blocks capture.
+///
+/// Zoom is by pinch on the viewfinder or the preset pill above the shutter.
+/// It is capped at [_zoomCap] because digital zoom beyond that degrades the
+/// photograph faster than it helps the reporter, both as evidence and as
+/// classifier input.
 class CaptureScreen extends StatefulWidget {
   const CaptureScreen({super.key});
 
@@ -39,6 +44,14 @@ class _CaptureScreenState extends State<CaptureScreen>
   _CameraState _state = _CameraState.initialising;
   bool _isCapturing = false;
   String? _errorDetail;
+
+  static const double _zoomCap = 8.0;
+  static const List<double> _zoomPresets = [1.0, 2.0, 5.0];
+
+  double _minZoom = 1.0;
+  double _maxZoom = 1.0;
+  double _zoom = 1.0;
+  double _zoomAtPinchStart = 1.0;
 
   @override
   void initState() {
@@ -106,6 +119,9 @@ class _CaptureScreenState extends State<CaptureScreen>
       );
       await controller.initialize();
 
+      final minZoom = await controller.getMinZoomLevel();
+      final maxZoom = await controller.getMaxZoomLevel();
+
       if (!mounted) {
         await controller.dispose();
         return;
@@ -113,6 +129,10 @@ class _CaptureScreenState extends State<CaptureScreen>
       setState(() {
         _controller = controller;
         _state = _CameraState.ready;
+        _minZoom = minZoom;
+        _maxZoom = maxZoom.clamp(minZoom, _zoomCap);
+        // The controller starts at its minimum, and a resume re-creates it.
+        _zoom = minZoom;
       });
     } on CameraException catch (e) {
       if (mounted) {
@@ -151,6 +171,20 @@ class _CaptureScreenState extends State<CaptureScreen>
       );
     } on Object {
       return null;
+    }
+  }
+
+  Future<void> _setZoom(double level) async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    final clamped = level.clamp(_minZoom, _maxZoom);
+    if (clamped == _zoom) return;
+    setState(() => _zoom = clamped);
+    try {
+      await controller.setZoomLevel(clamped);
+    } on CameraException {
+      // A dropped zoom step is harmless; the next pinch update corrects it.
     }
   }
 
@@ -276,12 +310,20 @@ class _CaptureScreenState extends State<CaptureScreen>
 
       case _CameraState.ready:
         final controller = _controller!;
-        return FittedBox(
-          fit: BoxFit.cover,
-          child: SizedBox(
-            width: controller.value.previewSize?.height ?? 1,
-            height: controller.value.previewSize?.width ?? 1,
-            child: CameraPreview(controller),
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onScaleStart: (_) => _zoomAtPinchStart = _zoom,
+          onScaleUpdate: (details) {
+            if (details.pointerCount < 2) return;
+            _setZoom(_zoomAtPinchStart * details.scale);
+          },
+          child: FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: controller.value.previewSize?.height ?? 1,
+              height: controller.value.previewSize?.width ?? 1,
+              child: CameraPreview(controller),
+            ),
           ),
         );
     }
@@ -360,6 +402,10 @@ class _CaptureScreenState extends State<CaptureScreen>
           children: [
             if (draft.hasPhotos) _buildThumbnailStrip(draft),
             const SizedBox(height: Gap.md),
+            if (_maxZoom > _minZoom) ...[
+              _buildZoomPill(),
+              const SizedBox(height: Gap.md),
+            ],
             Row(
               children: [
                 const SizedBox(width: 72),
@@ -387,6 +433,71 @@ class _CaptureScreenState extends State<CaptureScreen>
         ),
       ),
     );
+  }
+
+  /// Preset buttons in the style of the stock camera: the segment the current
+  /// zoom falls in shows the live value ("2.4×"), the others their preset.
+  Widget _buildZoomPill() {
+    final presets =
+        _zoomPresets.where((p) => p >= _minZoom && p <= _maxZoom).toList();
+    if (presets.isEmpty) return const SizedBox.shrink();
+
+    final active = presets.lastWhere(
+      (p) => _zoom >= p - 0.05,
+      orElse: () => presets.first,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final preset in presets)
+            Semantics(
+              button: true,
+              label: 'Zoom ${_formatZoom(preset)}',
+              child: GestureDetector(
+                onTap: () => _setZoom(preset),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  width: preset == active ? 48 : 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    color: preset == active
+                        ? Colors.white.withValues(alpha: 0.22)
+                        : Colors.transparent,
+                  ),
+                  child: Text(
+                    _formatZoom(preset == active ? _zoom : preset),
+                    style: TextStyle(
+                      color: preset == active
+                          ? ScopeTheme.warning
+                          : Colors.white,
+                      fontSize: preset == active ? 13 : 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatZoom(double level) {
+    final rounded = (level * 10).round() / 10;
+    final text = rounded == rounded.roundToDouble()
+        ? rounded.toStringAsFixed(0)
+        : rounded.toStringAsFixed(1);
+    return '$text×';
   }
 
   Widget _buildShutter(ReportDraft draft) {
