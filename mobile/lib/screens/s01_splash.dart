@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../core/config.dart';
 import '../core/device_id.dart';
 import '../core/theme.dart';
 import '../router.dart';
+import '../services/backend_status.dart';
 import '../widgets/scope_logo.dart';
 
 /// S01 — Splash.
 ///
 /// Covers initialisation: generating the anonymous device identifier on first
-/// launch and checking that the backend is reachable.
+/// launch and checking that the backend is reachable. The two run in parallel,
+/// so the check adds no time on a healthy launch. Its result is left in
+/// [BackendStatus] for Home, which shows an offline banner when it failed.
 ///
 /// No interactive elements and no skip button. Advances automatically after a
 /// minimum of 1.5 s so the transition does not flicker on a fast device, and
@@ -33,13 +37,11 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _initialise() async {
     final started = DateTime.now();
 
-    // The identifier must exist before any screen that files or reads a
-    // report. Failure here is not fatal — it is retried on next launch.
-    try {
-      await DeviceIdentity.get().timeout(AppConfig.splashMaximum);
-    } on Object {
-      // Deliberately swallowed: Home is more useful than an error on a splash.
-    }
+    await Future.wait([
+      _ensureDeviceIdentity(),
+      // Never throws, and is capped at the splash maximum.
+      context.read<BackendStatus>().check(),
+    ]);
 
     final elapsed = DateTime.now().difference(started);
     final remaining = AppConfig.splashMinimum - elapsed;
@@ -48,6 +50,16 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     if (mounted) context.go(Routes.home);
+  }
+
+  /// The identifier must exist before any screen that files or reads a
+  /// report. Failure here is not fatal — it is retried on next launch.
+  Future<void> _ensureDeviceIdentity() async {
+    try {
+      await DeviceIdentity.get().timeout(AppConfig.splashMaximum);
+    } on Object {
+      // Deliberately swallowed: Home is more useful than an error on a splash.
+    }
   }
 
   @override

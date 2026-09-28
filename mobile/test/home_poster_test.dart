@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:scope/screens/s02_home.dart';
+import 'package:scope/services/backend_status.dart';
+import 'package:scope/services/scope_api.dart';
 
 /// Widget tests for the S02 poster.
 ///
@@ -38,7 +41,11 @@ void main() {
     await tester.pumpWidget(
       MediaQuery(
         data: MediaQueryData(disableAnimations: reduceMotion),
-        child: const MaterialApp(home: HomeScreen()),
+        // Never checked, so the offline banner stays out of the layout.
+        child: ChangeNotifierProvider(
+          create: (_) => BackendStatus(ScopeApi()),
+          child: const MaterialApp(home: HomeScreen()),
+        ),
       ),
     );
 
