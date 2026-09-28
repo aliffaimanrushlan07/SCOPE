@@ -35,6 +35,16 @@ class ScopeTheme {
   static const Color line = Color(0xFFCBD5D2);
   static const Color lineSoft = Color(0xFFE4E9E7);
 
+  /// Accents from the SCOPE design system (Claude Design), same names there.
+  /// [tint] and [teal100] are quiet panel fills and hairlines, [teal200] reads
+  /// on [glass], the one dark hero surface. [violation] is Malaysia red: spend
+  /// it only on what is *not* allowed, never as a large fill.
+  static const Color tint = Color(0xFFF0FDFA);
+  static const Color teal100 = Color(0xFFCCFBF1);
+  static const Color teal200 = Color(0xFF99F6E4);
+  static const Color glass = Color(0xFF0F3B38);
+  static const Color violation = Color(0xFFCC0001);
+
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
