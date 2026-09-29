@@ -27,6 +27,11 @@ to spot afterwards and embarrassing to have pointed out at viva.
 The split is also STRATIFIED: each class keeps its proportion across train,
 validation and test, so the test set does not drift toward one class.
 
+An existing manifest is treated as FROZEN. Groups it already lists keep their
+split, and only images it has never seen are stratified and assigned, so adding
+photographs (hard negatives, say) cannot move an old test image into training.
+Pass --resplit to start over; old and new test results are then not comparable.
+
 Splitting happens BEFORE any augmentation. Augmenting first and splitting
 afterwards would scatter variants of one source image across all three splits,
 which is the same leakage in a less obvious form.
@@ -148,14 +153,32 @@ def group_by_hash(records: list[ImageRecord]) -> dict[str, list[ImageRecord]]:
     return groups
 
 
+def load_frozen_splits() -> dict[str, str]:
+    """Read {phash: split} from the existing manifest, if there is one.
+
+    Once a model has been trained and tested on a split, that split is frozen:
+    re-shuffling it when images are added would move old test images into
+    training, and the new model could no longer be compared with the old one
+    on held-out data. Only groups the manifest has never seen are assigned.
+    """
+    if not MANIFEST.is_file():
+        return {}
+    with MANIFEST.open(newline="") as handle:
+        return {row["phash"]: row["split"] for row in csv.DictReader(handle)}
+
+
 def assign_splits(
-    groups: dict[str, list[ImageRecord]], ratios: tuple[float, float, float]
+    groups: dict[str, list[ImageRecord]],
+    ratios: tuple[float, float, float],
+    frozen: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Assign each hash group to one split, stratified by class.
 
     Returns {phash: split}. Because the unit of assignment is the GROUP, not
-    the image, near-identical frames always land together.
+    the image, near-identical frames always land together. Groups already in
+    `frozen` keep their split; only the rest are shuffled and stratified.
     """
+    frozen = frozen or {}
     rng = random.Random(SEED)
 
     # A group's class is the class of its members. In the rare case a
@@ -164,14 +187,18 @@ def assign_splits(
     by_class: dict[str, list[str]] = defaultdict(list)
     conflicted: list[str] = []
 
+    assignment: dict[str, str] = {}
+
     for phash, members in groups.items():
         labels = {m.label for m in members}
         if len(labels) > 1:
             conflicted.append(phash)
             continue
+        if phash in frozen:
+            assignment[phash] = frozen[phash]
+            continue
         by_class[labels.pop()].append(phash)
 
-    assignment: dict[str, str] = {}
     for phash in conflicted:
         assignment[phash] = "conflict"
 
@@ -294,6 +321,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train", type=float, default=DEFAULT_RATIOS[0])
     parser.add_argument("--val", type=float, default=DEFAULT_RATIOS[1])
+    parser.add_argument("--resplit", action="store_true",
+                        help="ignore the existing manifest and re-split everything; "
+                             "old and new test results are then not comparable")
     args = parser.parse_args()
 
     ratios = (args.train, args.val, 1.0 - args.train - args.val)
@@ -308,8 +338,23 @@ def main() -> int:
     groups = group_by_hash(records)
     duplicates = len(records) - len(groups)
 
-    assignment = assign_splits(groups, ratios)
+    frozen = {} if args.resplit else load_frozen_splits()
+    assignment = assign_splits(groups, ratios, frozen)
     conflicts = sum(1 for v in assignment.values() if v == "conflict")
+
+    if frozen:
+        kept = sum(1 for p in groups if p in frozen and assignment[p] != "conflict")
+        new = {s: sum(1 for p in groups if p not in frozen and assignment[p] == s)
+               for s in SPLITS}
+        missing = sum(1 for p in frozen if p not in groups)
+        print(f"Existing split kept for {kept} groups; new groups assigned: {new}")
+        # A frozen group that became a conflict means a new image under the
+        # other label duplicates an old one — the old image is dropped with it.
+        lost = sum(1 for p in groups if p in frozen and assignment[p] == "conflict")
+        if lost or missing:
+            print(f"WARNING: {lost} previously split group(s) now conflict and "
+                  f"{missing} are no longer in data/raw/. Old test figures no "
+                  "longer describe exactly this dataset.")
 
     rows = write_manifest(groups, assignment)
     report = write_report(rows, len(records), skipped, conflicts, duplicates)
