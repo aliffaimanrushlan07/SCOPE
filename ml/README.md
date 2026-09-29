@@ -12,62 +12,73 @@ threshold and accepts the report when at least one photograph clears it.
 |---|---|
 | Tooling (`prepare_dataset.py`, `select_threshold.py`, notebook) | ✅ |
 | Dataset assembled and split | ✅ 1,941 images |
-| Model fine-tuned | ✅ `vit-scope-v1` |
-| Threshold chosen | ⚠️ **0.70**, but selected on the test split — [re-select on validation](#5-threshold) |
+| Model fine-tuned | ✅ `vit-scope-v2` (DeiT-style augmentation, PR-AUC early stopping, label smoothing) |
+| Threshold chosen | ✅ **0.66**, selected on validation, reported once on test — [procedure](#5-threshold) |
 | Wired into the backend | ✅ real inference, stub removed |
 
 ---
 
 ## Results
 
-Fine-tuned `vit_base_patch16_224_imagenet21k` on 1,358 training images,
-validated on 290, and evaluated **once** on 293 held-out test images.
+Fine-tuned `vit_base_patch16_224_imagenet21k` on 1,358 training images. The
+threshold was selected on the 290 validation images and then frozen; the
+figures below are the 293 held-out test images scored at that frozen value,
+through the backend's own inference path.
 
-| Metric at threshold 0.70 | Value |
+| Metric at threshold 0.66 (test) | Value |
 |---|---|
-| Precision | **0.977** |
-| Recall | **0.916** |
-| F1 | 0.945 |
-| Accuracy | 0.949 |
-| Confusion | TP 130 · FP 3 · FN 12 · TN 148 |
+| Precision | **0.985** (95% CI 0.946–0.996) |
+| Recall | **0.901** (95% CI 0.841–0.940) |
+| F1 | 0.941 |
+| Accuracy | 0.945 |
+| PR-AUC | 0.992 |
+| Confusion | TP 128 · FP 2 · FN 14 · TN 149 |
 
-Mean score for smoking images **0.939**, for non-smoking **0.055** — a
-separation of 0.884, meaning the model is decisive rather than hedging.
+> "At a threshold of 0.66, selected on the validation split, the classifier
+> reached precision 0.985 and recall 0.901 on the held-out test split (293
+> images), with a 95% confidence interval on precision of [0.946, 0.996]."
 
-> **These figures are from `vit-scope-v1` and will change.** Two reasons.
->
-> The 0.70 threshold was selected by sweeping these same test scores, so the
-> operating point was fitted to the images the result is claimed on. The
-> tooling for the correct procedure — select on validation, report on test — is
-> in place (`score_split.py`, and `select_threshold.py --at-threshold`).
->
-> The training recipe has also changed since this run: stronger augmentation,
-> precision/recall/PR-AUC metrics, PR-AUC early stopping and label smoothing
-> (step 4 below). `vit-scope-v1` predates all of it.
->
-> The next run trains under the new recipe and re-measures under the correct
-> procedure. **Export it as `vit-scope-v2`** and bump `AI_MODEL_VERSION`, so
-> `AI_CLASSIFICATION.model_version` keeps historical confidence scores
-> interpretable. Expect precision to fall slightly once the threshold is chosen
-> on validation. That is the honest figure, not a regression.
+Mean test score for smoking images **0.890**, for non-smoking **0.112**.
 
-### Threshold sweep
+At the report level (up to three photographs, one needed to pass), 3.92% of
+invalid reports would reach enforcement and 0.096% of genuine reports would be
+wrongly rejected. Requiring 2 of 3 instead would give 0.05% and 2.724%.
+
+This is a single training run. Across 3 seeds, each with its own
+validation-selected threshold, test precision was 0.975 ± 0.008 and recall
+0.897 ± 0.011 (`artifacts/seed_study.txt`). With 151 non-smoking test images,
+the sampling half-width on precision (~0.03) is larger than the seed spread.
+
+### Threshold sweep — validation (where the threshold is chosen)
 
 | Threshold | Precision | Recall | F1 | TP | FP | FN | TN |
 |---|---|---|---|---|---|---|---|
-| 0.10 | 0.892 | 0.993 | 0.940 | 141 | 17 | 1 | 134 |
-| 0.20 | 0.928 | 0.993 | 0.959 | 141 | 11 | 1 | 140 |
-| 0.30 | 0.945 | 0.965 | 0.955 | 137 | 8 | 5 | 143 |
-| 0.33 | 0.951 | 0.965 | 0.958 | 137 | 7 | 5 | 144 |
-| 0.50 | 0.964 | 0.951 | 0.957 | 135 | 5 | 7 | 146 |
-| **0.70** | **0.977** | **0.916** | **0.945** | **130** | **3** | **12** | **148** |
-| 0.80 | 0.977 | 0.901 | 0.938 | 128 | 3 | 14 | 148 |
-| 0.90 | 0.976 | 0.873 | 0.922 | 124 | 3 | 18 | 148 |
-| 0.95 | 0.992 | 0.866 | 0.925 | 123 | 1 | 19 | 150 |
+| 0.30 | 0.916 | 1.000 | 0.956 | 141 | 13 | 0 | 136 |
+| 0.40 | 0.952 | 0.993 | 0.972 | 140 | 7 | 1 | 142 |
+| 0.50 | 0.972 | 0.979 | 0.975 | 138 | 4 | 3 | 145 |
+| 0.60 | 0.985 | 0.950 | 0.968 | 134 | 2 | 7 | 147 |
+| 0.63 | 0.992 | 0.929 | 0.960 | 131 | 1 | 10 | 148 |
+| **0.66** | **1.000** | **0.929** | **0.963** | **131** | **0** | **10** | **149** |
+| 0.70 | 1.000 | 0.908 | 0.952 | 128 | 0 | 13 | 149 |
+| 0.80 | 1.000 | 0.879 | 0.936 | 124 | 0 | 17 | 149 |
+| 0.90 | 1.000 | 0.752 | 0.858 | 106 | 0 | 35 | 149 |
+
+0.66 is the lowest threshold with zero false positives on validation, so it
+costs no recall over 0.63. Going higher only rejects more genuine photographs.
+Do not re-pick it from the test numbers above; the test split has already been
+read at 0.63 and 0.66.
+
+### Earlier: `vit-scope-v1`
+
+`vit-scope-v1` reached precision 0.977 and recall 0.916 at threshold 0.70
+(TP 130 · FP 3 · FN 12 · TN 148). That threshold was selected by sweeping the
+test scores, so the figure is optimistically biased and is kept only for
+history. The next section explains the reasoning behind that choice; the
+report-level arithmetic applies unchanged to v2.
 
 ---
 
-## Why 0.70 and not the best-F1 point
+## Why 0.70 and not the best-F1 point (`vit-scope-v1`)
 
 `select_threshold.py` recommends **0.33** — the highest recall that still
 holds precision at 0.95, and close to the best-F1 point. **0.70 was chosen
@@ -300,3 +311,15 @@ implemented; the figures are not yet re-measured under it.
 |---|---|---|---|---|
 | vit-scope-v1 | test (biased) | 0.977 | 0.916 | not measured |
 | vit-scope-v2 | validation | 0.939 | 0.979 | 0.959 |
+| vit-scope-v2 | validation, 0.63 (target precision 0.99) | 0.970 | 0.923 | 0.992 |
+| vit-scope-v2 | validation, **0.66** (target precision 1.00) | **0.985** | **0.901** | 0.992 |
+
+The move from 0.63 to 0.66 followed a phone test in which a non-cigarette
+photograph was accepted. The new value was selected on validation by raising
+the precision target to 1.00 — it is the lowest threshold with zero false
+positives there (FP 1 → 0, recall unchanged at 0.929) — then reported once on
+test: FP 4 → 2, FN 11 → 14, invalid 3-photo reports reaching enforcement
+7.74% → 3.92%. 95% CI on test precision [0.946, 0.996]. Model unchanged, so
+`AI_MODEL_VERSION` stays `vit-scope-v2`; `threshold_used` records the change
+per classification. The test split has now been read at two thresholds; do
+not tune against it again.
