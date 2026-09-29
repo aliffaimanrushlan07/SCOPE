@@ -28,9 +28,16 @@ class Settings(BaseSettings):
     # configurable value" required by SCOPE-System-Flow-Revised.md section S10:
     # it can be retuned after model evaluation without shipping a new build of
     # the mobile application.
-    ai_confidence_threshold: float = 0.85
-    ai_model_version: str = "vit-scope-v1"
-    ai_model_path: str = "../ml/artifacts/vit-scope-v1.keras"
+    #
+    # These three move TOGETHER. A threshold is selected for one specific
+    # checkpoint, so pairing one model's path with another's threshold is
+    # meaningless; and model_version is what AI_CLASSIFICATION.model_version
+    # stores per report, so a stale version silently changes what a historical
+    # confidence score meant. 0.63 is the value select_threshold.py returned on
+    # the validation split for vit-scope-v2 — see ml/README.md.
+    ai_confidence_threshold: float = 0.63
+    ai_model_version: str = "vit-scope-v2"
+    ai_model_path: str = "../ml/artifacts/vit-scope-v2.keras"
     ai_request_timeout_seconds: int = 30
 
     # Forces the deterministic stub even when a model file is present. Useful
