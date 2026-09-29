@@ -24,9 +24,6 @@ import {
  * this page, and no endpoint behind one. That absence is the design, not an
  * omission: FR12 (manual review / override) was removed, and the AI decision
  * is final because it is made before submission.
- *
- * The AI panel is provenance — which model version and threshold judged this
- * evidence, and when. It is display only.
  */
 export default function ReportDetail() {
   const { reportId } = useParams()
@@ -194,60 +191,7 @@ export default function ReportDetail() {
                     </span>
                   }
                 />
-                {report.location_integrity_metres != null && (
-                  <Row
-                    label="Capture distance"
-                    value={
-                      <>
-                        {report.location_integrity_metres} m
-                        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                          Between where the photo was taken and where the
-                          reporter tagged it.
-                        </div>
-                      </>
-                    }
-                  />
-                )}
               </dl>
-            </section>
-
-            <section className="card" style={{ padding: 18 }}>
-              <h3 style={{ fontSize: 15, marginBottom: 12 }}>AI classification</h3>
-              {report.classification ? (
-                <dl style={{ margin: 0, fontSize: 13.5 }}>
-                  <Row label="Outcome" value={report.classification.outcome} />
-                  <Row
-                    label="Highest score"
-                    value={<Confidence value={report.classification.highest_confidence} />}
-                  />
-                  <Row
-                    label="Threshold"
-                    value={
-                      <span className="mono">
-                        {Number(report.classification.threshold_used).toFixed(4)}
-                      </span>
-                    }
-                  />
-                  <Row
-                    label="Model"
-                    value={<span className="mono">{report.classification.model_version}</span>}
-                  />
-                  <Row
-                    label="Photos"
-                    value={`${report.classification.photos_passed} of ${report.classification.photos_evaluated} passed`}
-                  />
-                  <Row
-                    label="Evaluated"
-                    value={formatDateTime(report.classification.evaluated_at)}
-                  />
-                </dl>
-              ) : (
-                <div className="muted">No classification record.</div>
-              )}
-              <p className="muted" style={{ fontSize: 12, marginTop: 12, lineHeight: 1.5 }}>
-                Evaluated before submission. Display only — this result cannot
-                be changed from the dashboard.
-              </p>
             </section>
 
             <section className="card" style={{ padding: 18 }}>

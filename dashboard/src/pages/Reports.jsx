@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import * as api from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import {
-  Confidence,
   ErrorState,
   Loading,
   Notice,
@@ -14,7 +13,7 @@ import {
 /**
  * D04 — Reports: list and filter (FR10, FR13).
  *
- * Five columns: Reference, Date & time, Location, Premise name, AI confidence.
+ * Four columns: Reference, Date & time, Location, Premise name.
  *
  * The filters are search and date range. There is deliberately NO status
  * filter — no status exists to filter on — and no violation type or premise
@@ -155,7 +154,6 @@ export default function Reports() {
                       <th>Date &amp; time</th>
                       <th>Location</th>
                       <th>Premise name</th>
-                      <th>AI confidence</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -169,9 +167,6 @@ export default function Reports() {
                         <td>{formatDateTime(row.submitted_at)}</td>
                         <td>{row.address_text || '—'}</td>
                         <td>{row.premise_name || <span className="muted">Not given</span>}</td>
-                        <td>
-                          <Confidence value={row.ai_confidence} />
-                        </td>
                       </tr>
                     ))}
                   </tbody>
