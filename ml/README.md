@@ -300,3 +300,29 @@ implemented; the figures are not yet re-measured under it.
 |---|---|---|---|---|
 | vit-scope-v1 | test (biased) | 0.977 | 0.916 | not measured |
 | vit-scope-v2 | validation | 0.939 | 0.979 | 0.959 |
+
+### v3 — hard negatives (dataset of 2,119 images)
+
+174 new phone photographs were added: 131 hard negatives (pens, pencils,
+chopsticks, lipstick, straws, an empty hand at the mouth) and 43 lit
+cigarettes in field conditions. `prepare_dataset.py` kept every v2 image in
+its existing split and assigned only the new ones, so both models below are
+scored on the same held-out test split (323 images, 22 of them hard
+negatives), which neither model trained on.
+
+| Model | Threshold (chosen on validation) | Precision | Recall | PR-AUC | FP | FN | Hard negatives accepted |
+|---|---|---|---|---|---|---|---|
+| vit-scope-v2 | 0.66 | 0.872 | 0.907 | 0.962 | 20 | 14 | 18 / 22 |
+| **vit-scope-v3** | **0.71** (target precision 1.00) | **0.978** | **0.880** | **0.989** | **3** | **18** | **1 / 22** |
+
+"At a threshold of 0.71, selected on the validation split, vit-scope-v3
+reached precision 0.978 and recall 0.880 on the held-out test split (323
+images), with a 95% confidence interval on precision of [0.937, 0.992],
+accepting 1 of 22 hard-negative photographs against 18 for vit-scope-v2."
+
+On this split v2's precision is 0.872, well below the 0.985 it reached on the
+v2 test split: that split contained no look-alike objects, so it could not
+reveal the weakness a phone test found. The one hard negative v3 still accepts
+is a pen from that phone test (0.967 under v2, 0.825 under v3). All 8
+field-condition cigarette photographs in test pass under both models. Single
+training run; seed variance for v3 is not yet measured.
