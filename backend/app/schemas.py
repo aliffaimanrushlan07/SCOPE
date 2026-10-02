@@ -131,6 +131,18 @@ class InfographicOut(BaseModel):
     updated_at: dt.datetime | None
 
 
+class AdminInfographicOut(BaseModel):
+    """D06 view of a slot. Unlike the public listing it includes empty slots,
+    whose title and image_path are null."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    infographic_id: int
+    title: str | None
+    image_path: str | None
+    updated_at: dt.datetime | None
+
+
 class HotspotPoint(BaseModel):
     """One weighted point of the public density heatmap.
 

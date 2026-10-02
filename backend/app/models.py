@@ -153,13 +153,15 @@ class AdminActivityLog(Base):
 
 
 class Infographic(Base):
-    """Table 4.9 — three fixed awareness slots backing D06, S02 and S04."""
+    """Table 4.9 — two fixed awareness slots backing D06 and S04.
+
+    title and image_path are both NULL while a slot is empty."""
 
     __tablename__ = "infographic"
 
     infographic_id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
-    title: Mapped[str] = mapped_column(String(120))
-    image_path: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str | None] = mapped_column(String(120))
+    image_path: Mapped[str | None] = mapped_column(String(255))
     source_filename: Mapped[str | None] = mapped_column(String(150))
     updated_by: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("admin_user.admin_id", ondelete="SET NULL")

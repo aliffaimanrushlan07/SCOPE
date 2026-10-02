@@ -54,7 +54,7 @@ Verify the schema:
 docker exec -i scope-db psql -U scope -d scope -f - < infra/verify.sql
 ```
 
-Six tables, PostGIS active, three infographic slots and two admin accounts.
+Six tables, PostGIS active, two infographic slots and two admin accounts.
 
 The SQL in `infra/` runs **only on first boot**, when the volume is empty. After editing `schema.sql` or `seed.sql`:
 
@@ -126,5 +126,5 @@ These are not implementation details — each one is a decision defended in the 
 - **Maximum three photographs per report**, enforced by a database constraint, not only by the UI.
 - **Only `PASS` classifications persist.** A total failure returns the reporter to S08 and creates no report.
 - **The public map (S06) shows density, never pins.** Individual pins would publicly attribute a report to a named premise.
-- **Three fixed infographic slots.** Deletion is blocked at the database level; S02 and S04 have no empty state.
+- **Two fixed infographic slots.** D06 can replace or delete (empty) each slot, but the slot rows themselves cannot be added or removed; S04 lists published slots only.
 - **No violation type, no premise type.** The reporter supplies an optional free-text `premise_name` only.

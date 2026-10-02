@@ -183,6 +183,16 @@ input, select {
   background: var(--brand-dark);
 }
 
+.btn-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--white);
+}
+
 .field {
   display: flex;
   flex-direction: column;
