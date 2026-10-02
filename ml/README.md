@@ -244,10 +244,14 @@ requires.
 
 ## Limitations to state honestly in the report
 
-**Domain gap.** The training images are web-sourced photographs, not phone
+**Domain gap.** Most training images are web-sourced photographs, not phone
 photos taken at a distance in a Malaysian food court. Real submissions will be
-further from the camera, more motion-blurred, and worse lit. Measured accuracy
-on this test set is an **upper bound** on field performance.
+further from the camera, more motion-blurred, and worse lit. v3 narrows the gap
+with 174 phone photographs (131 hard negatives, 43 field-condition lit
+cigarettes), and the augmentation rehearses distance and blur, but field photos
+are still under 10% of the data and only 30 of them are in test. Measured
+accuracy remains an **upper bound** on field performance: the phone tests in
+this project found errors the test split had not.
 
 **Failure reasons are partly heuristic.** Blur is measured: a photograph below
 the sharpness cutoff fails as "Image too blurry" on a variance-of-Laplacian
@@ -257,20 +261,25 @@ classifier reports how sure it is, not why. Distance from a detection bounding
 box would make "too far" a measurement too.
 
 **No human check.** FR12 was removed, so a false positive reaches enforcement
-uncorrected. The defence is that the threshold is tuned to minimise exactly
-that (3 false positives in 151 non-violations), and the dashboard is advisory —
-it informs patrol planning rather than triggering enforcement against a named
-party.
+uncorrected. The defence is that the operating point is set to minimise
+exactly that: at 0.90, vit-scope-v3 accepted 0 of 173 non-smoking test
+photographs, including 0 of 22 hard negatives (95% CI on precision
+0.967–1.000). The dashboard is also advisory: it informs patrol planning rather
+than triggering enforcement against a named party.
 
-**Single evaluation run.** The test split was used once. Figures are not
-averaged over repeated runs with different seeds, so they carry the variance of
-a single training run. Section 11 of the notebook and `aggregate_seeds.py`
-measure that spread; until they have been run, quote the confidence intervals
-`select_threshold.py` prints and say the seed variance is unmeasured.
+**Single training run for v3.** vit-scope-v2 was retrained across 3 seeds
+(precision 0.975 ± 0.008, `artifacts/seed_study.txt`); vit-scope-v3 has not
+been, so its figures carry the variance of one run. Section 11 of the notebook
+and `aggregate_seeds.py` measure that spread; until they are run for v3, quote
+the confidence intervals `select_threshold.py` prints and say the seed
+variance is unmeasured. The v3 test split has also been read twice — at 0.71
+and at 0.90, both fixed beforehand — so it must not be used to tune again.
 
-**The test split is small.** With 151 non-smoking images, the 95% confidence
-interval on precision is roughly ±0.03. Averaging over training seeds does not
-narrow that — only more labelled test data would. Both sources of uncertainty
+**The test split is small.** With 173 non-smoking images, the 95% confidence
+interval on precision is still a few points wide (0.967–1.000 at 0.90), and
+only 22 of those images are hard negatives — too few to measure any single
+object, such as straws, on its own. Averaging over training seeds does not
+narrow that; only more labelled test data would. Both sources of uncertainty
 should be stated; neither alone answers "how much of this is luck".
 
 **A photograph of a screen showing a lit cigarette is accepted.** The model
