@@ -12,6 +12,8 @@ The rules implemented here are confirmed decisions, not defaults:
 - Only a total failure returns the reporter to S08.
 - The threshold is read from settings per request, never captured at import
   time, so it stays retunable without a new mobile build (section S10).
+- A photograph below the sharpness cutoff (AI_MIN_SHARPNESS) fails as "Image
+  too blurry" whatever it scores; blur is measured, not inferred.
 
 PREPROCESSING MUST MATCH TRAINING EXACTLY
 -----------------------------------------
@@ -29,6 +31,7 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import io
 import logging
 import os
 import threading
@@ -149,6 +152,40 @@ def _preprocess(images: list[bytes]):
     return tf.stack(tensors)
 
 
+SHARPNESS_LONG_SIDE = 512
+
+
+def sharpness(data: bytes) -> float:
+    """Variance of the Laplacian: a measurement of focus, not a model guess.
+
+    Edges produce large second derivatives; blur flattens them, so a blurry
+    photograph has a low variance. The image is first reduced to a fixed long
+    side, because the raw value grows with resolution and a phone sending a
+    larger photo must not look sharper for that reason alone.
+
+    Independent of the classifier's preprocessing on purpose: it decides
+    whether the photograph is usable evidence before the model is consulted.
+    """
+    import numpy as np
+    from PIL import Image, ImageOps
+
+    with Image.open(io.BytesIO(data)) as img:
+        img = ImageOps.exif_transpose(img).convert("L")
+        scale = SHARPNESS_LONG_SIDE / max(img.size)
+        if scale < 1:
+            img = img.resize(
+                (round(img.width * scale), round(img.height * scale)),
+                Image.Resampling.BILINEAR,
+            )
+        pixels = np.asarray(img, dtype=np.float64)
+
+    laplacian = (
+        pixels[:-2, 1:-1] + pixels[2:, 1:-1] + pixels[1:-1, :-2] + pixels[1:-1, 2:]
+        - 4 * pixels[1:-1, 1:-1]
+    )
+    return float(laplacian.var())
+
+
 def score_images(images: list[bytes]) -> list[float]:
     """Score raw image bytes with the real model and return P(smoking) each.
 
@@ -195,11 +232,19 @@ def classify_photos(images: list[tuple[str, str, bytes]]) -> ClassificationResul
     else:
         scores = score_images([data for _, _, data in images])
 
+    min_sharpness = settings.ai_min_sharpness
     results: list[PhotoResult] = []
-    for index, ((original_name, staged_name, _), confidence) in enumerate(
+    for index, ((original_name, staged_name, data), confidence) in enumerate(
         zip(images, scores, strict=True)
     ):
-        passed = confidence >= threshold
+        blurry = min_sharpness > 0 and _is_blurry(data, min_sharpness)
+        passed = confidence >= threshold and not blurry
+        if passed:
+            reason = None
+        elif blurry:
+            reason = REASON_TOO_BLURRY
+        else:
+            reason = _failure_reason(confidence, blur_measured=min_sharpness > 0)
         results.append(
             PhotoResult(
                 index=index,
@@ -207,7 +252,7 @@ def classify_photos(images: list[tuple[str, str, bytes]]) -> ClassificationResul
                 staged_filename=staged_name,
                 confidence=round(confidence, 4),
                 passed=passed,
-                reason=None if passed else _failure_reason(confidence),
+                reason=reason,
             )
         )
 
@@ -226,7 +271,21 @@ def classify_photos(images: list[tuple[str, str, bytes]]) -> ClassificationResul
     )
 
 
-def _failure_reason(confidence: float) -> str:
+def _is_blurry(data: bytes, min_sharpness: float) -> bool:
+    """True when the photograph measures below the sharpness cutoff.
+
+    A photograph that cannot be measured is not rejected for blur: the
+    classifier still has to clear the threshold, and refusing evidence because
+    of a decoding quirk would be a failure the reporter cannot fix.
+    """
+    try:
+        return sharpness(data) < min_sharpness
+    except Exception:
+        logger.warning("Sharpness could not be measured; blur check skipped.")
+        return False
+
+
+def _failure_reason(confidence: float, blur_measured: bool = False) -> str:
     """Map a low score to an actionable reason.
 
     The model is a single-label classifier, so it reports how confident it is
@@ -235,14 +294,14 @@ def _failure_reason(confidence: float) -> str:
     usually means nothing cigarette-like was found, while a middling score
     usually means something was found but indistinctly.
 
-    A future improvement would derive blur from a Laplacian variance check and
-    subject distance from a detection bounding box, which would make the reason
-    a measurement rather than an inference.
+    When the sharpness check is enabled, blur is measured by `sharpness`
+    instead, so a photograph that reached this point is known to be in focus
+    and is never blamed on blur. Subject distance is still inferred.
     """
     if confidence < 0.15:
         return REASON_NO_CIGARETTE
     if confidence < 0.40:
-        return REASON_TOO_BLURRY
+        return REASON_NO_CIGARETTE if blur_measured else REASON_TOO_BLURRY
     return REASON_TOO_FAR
 
 

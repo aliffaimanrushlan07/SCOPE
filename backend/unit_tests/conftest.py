@@ -45,6 +45,7 @@ def stub_ai_settings(monkeypatch):
     monkeypatch.setattr(inference.settings, "ai_stub_mode", True)
     monkeypatch.setattr(inference.settings, "ai_confidence_threshold", 0.6)
     monkeypatch.setattr(inference.settings, "ai_model_version", "vit-v1-test")
+    monkeypatch.setattr(inference.settings, "ai_min_sharpness", 0.0)
     return inference.settings
 
 

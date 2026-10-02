@@ -221,3 +221,86 @@ def test_score_images_returns_positive_class_probability(monkeypatch):
     monkeypatch.setattr(inference, "_preprocess", lambda images: images)
 
     assert inference.score_images([b"a", b"b"]) == [0.9, 0.25]
+
+
+# ---------------------------------------------------------------------------
+# sharpness / blur check
+# ---------------------------------------------------------------------------
+
+def _jpeg(image) -> bytes:
+    import io
+
+    buffer = io.BytesIO()
+    image.save(buffer, "JPEG", quality=95)
+    return buffer.getvalue()
+
+
+@pytest.fixture
+def sharp_and_blurry():
+    from PIL import Image, ImageDraw, ImageFilter
+
+    image = Image.new("RGB", (640, 480), "white")
+    draw = ImageDraw.Draw(image)
+    for x in range(0, 640, 16):
+        draw.line([(x, 0), (x, 480)], fill="black", width=3)
+    return _jpeg(image), _jpeg(image.filter(ImageFilter.GaussianBlur(6)))
+
+
+def test_sharpness_is_higher_for_sharp_than_blurred_image(sharp_and_blurry):
+    """TC-INF-18 (Valid): blurring the same picture must lower its sharpness."""
+    sharp, blurry = sharp_and_blurry
+    assert inference.sharpness(sharp) > inference.sharpness(blurry)
+
+
+def test_sharpness_does_not_grow_with_resolution():
+    """TC-INF-19 (Boundary): the same scene sent at twice the resolution must
+    measure about the same, or a bigger phone photo would bypass the check."""
+    from PIL import Image, ImageDraw
+
+    large = Image.new("RGB", (1024, 768), "white")
+    ImageDraw.Draw(large).rectangle([200, 200, 800, 600], outline="black", width=8)
+    small = large.resize((512, 384), Image.Resampling.BILINEAR)
+
+    a, b = inference.sharpness(_jpeg(small)), inference.sharpness(_jpeg(large))
+    assert abs(a - b) / a < 0.25
+
+
+def test_blurry_photo_fails_even_when_score_clears_threshold(
+    stub_ai_settings, monkeypatch, sharp_and_blurry
+):
+    """TC-INF-20 (Invalid): a high score does not rescue a blurry photograph;
+    it fails as "Image too blurry" while the sharp one passes."""
+    sharp, blurry = sharp_and_blurry
+    monkeypatch.setattr(inference.settings, "ai_min_sharpness", 20.0)
+    monkeypatch.setattr(inference, "_stub_score", lambda data: 0.99)
+
+    result = inference.classify_photos(
+        [("sharp.jpg", "0.jpg", sharp), ("blurry.jpg", "1.jpg", blurry)]
+    )
+
+    assert [p.passed for p in result.photos] == [True, False]
+    assert result.photos[1].reason == inference.REASON_TOO_BLURRY
+    assert result.outcome == inference.OUTCOME_PASS
+
+
+def test_unmeasurable_photo_is_not_rejected_for_blur(stub_ai_settings, monkeypatch):
+    """TC-INF-21 (Edge case): bytes the sharpness check cannot decode fall back
+    to the classifier alone rather than being refused for blur."""
+    monkeypatch.setattr(inference.settings, "ai_min_sharpness", 20.0)
+    monkeypatch.setattr(inference, "_stub_score", lambda data: 0.99)
+
+    result = inference.classify_photos([("odd.bin", "0.jpg", b"not an image")])
+
+    assert result.photos[0].passed is True
+
+
+def test_sharp_low_score_photo_is_never_blamed_on_blur(stub_ai_settings, monkeypatch, sharp_and_blurry):
+    """TC-INF-22 (Valid): with blur measured, a sharp photo in the old
+    'blurry' score band is told no cigarette was detected instead."""
+    sharp, _ = sharp_and_blurry
+    monkeypatch.setattr(inference.settings, "ai_min_sharpness", 20.0)
+    monkeypatch.setattr(inference, "_stub_score", lambda data: 0.3)
+
+    result = inference.classify_photos([("sharp.jpg", "0.jpg", sharp)])
+
+    assert result.photos[0].reason == inference.REASON_NO_CIGARETTE

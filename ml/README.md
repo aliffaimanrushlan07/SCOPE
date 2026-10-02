@@ -244,38 +244,64 @@ requires.
 
 ## Limitations to state honestly in the report
 
-**Domain gap.** The training images are web-sourced photographs, not phone
+**Domain gap.** Most training images are web-sourced photographs, not phone
 photos taken at a distance in a Malaysian food court. Real submissions will be
-further from the camera, more motion-blurred, and worse lit. Measured accuracy
-on this test set is an **upper bound** on field performance.
+further from the camera, more motion-blurred, and worse lit. v3 narrows the gap
+with 174 phone photographs (131 hard negatives, 43 field-condition lit
+cigarettes), and the augmentation rehearses distance and blur, but field photos
+are still under 10% of the data and only 30 of them are in test. Measured
+accuracy remains an **upper bound** on field performance: the phone tests in
+this project found errors the test split had not.
 
-**Failure reasons are heuristic.** The model is a single-label classifier: it
-reports how confident it is that a violation is present, not *why* it is
-unconvinced. The "too blurry" / "too far" messages are presentational bands
-over the confidence score, not measurements. Deriving blur from a Laplacian
-variance check and distance from a detection bounding box would make them real.
+**Failure reasons are partly heuristic.** Blur is measured: a photograph below
+the sharpness cutoff fails as "Image too blurry" on a variance-of-Laplacian
+measurement, not on its score. "Too far" and "no lit cigarette" are still
+presentational bands over the confidence score, because a single-label
+classifier reports how sure it is, not why. Distance from a detection bounding
+box would make "too far" a measurement too.
 
 **No human check.** FR12 was removed, so a false positive reaches enforcement
-uncorrected. The defence is that the threshold is tuned to minimise exactly
-that (3 false positives in 151 non-violations), and the dashboard is advisory —
-it informs patrol planning rather than triggering enforcement against a named
-party.
+uncorrected. The defence is that the operating point is set to minimise
+exactly that: at 0.90, vit-scope-v3 accepted 0 of 173 non-smoking test
+photographs, including 0 of 22 hard negatives (95% CI on precision
+0.967–1.000). The dashboard is also advisory: it informs patrol planning rather
+than triggering enforcement against a named party.
 
-**Single evaluation run.** The test split was used once. Figures are not
-averaged over repeated runs with different seeds, so they carry the variance of
-a single training run. Section 11 of the notebook and `aggregate_seeds.py`
-measure that spread; until they have been run, quote the confidence intervals
-`select_threshold.py` prints and say the seed variance is unmeasured.
+**Single training run for v3.** vit-scope-v2 was retrained across 3 seeds
+(precision 0.975 ± 0.008, `artifacts/seed_study.txt`); vit-scope-v3 has not
+been, so its figures carry the variance of one run. Section 11 of the notebook
+and `aggregate_seeds.py` measure that spread; until they are run for v3, quote
+the confidence intervals `select_threshold.py` prints and say the seed
+variance is unmeasured. The v3 test split has also been read twice — at 0.71
+and at 0.90, both fixed beforehand — so it must not be used to tune again.
 
-**The test split is small.** With 151 non-smoking images, the 95% confidence
-interval on precision is roughly ±0.03. Averaging over training seeds does not
-narrow that — only more labelled test data would. Both sources of uncertainty
+**The test split is small.** With 173 non-smoking images, the 95% confidence
+interval on precision is still a few points wide (0.967–1.000 at 0.90), and
+only 22 of those images are hard negatives — too few to measure any single
+object, such as straws, on its own. Averaging over training seeds does not
+narrow that; only more labelled test data would. Both sources of uncertainty
 should be stated; neither alone answers "how much of this is luck".
 
-**The published threshold was selected on the test split.** Until the model is
-retrained and the validation-first procedure in section 5 is run end to end,
-the reported precision of 0.977 is an upper bound on itself. The procedure is
-implemented; the figures are not yet re-measured under it.
+**A photograph of a screen showing a lit cigarette is accepted.** The model
+judges what the picture shows, not whether it is a real scene: a phone photo of
+a laptop playing a cigarette stock video scored 0.932 and passed both the 0.90
+threshold and the sharpness check (screens photograph sharply). No photographs
+of screens are in the training negatives. This is **accepted deliberately**:
+the live demonstration is held indoors, where lighting a real cigarette would
+be unsafe and unhealthy, so the demo photographs a lit cigarette on a screen.
+Misuse to fabricate a report is bounded by camera-only capture at S08 and the
+per-device limit of 5 reports per hour. The fix, if needed, is a v4 dataset
+with photographs of screens labelled as non-smoking; a hand-written moiré
+detector was considered and rejected as too sensitive to angle and distance.
+
+**An unlit cigarette is not a training negative.** The model learned "smoking"
+from photographs that are mostly lit, but was never shown an unlit cigarette
+held the same way, so it may accept one. Like screens, this needs v4 data.
+
+**The 0.90 threshold is a policy, not a rule output.** The validation-first
+procedure gives 0.71 for vit-scope-v3. 0.90 was set above it deliberately for
+strictness and fixed before test was scored at it; its cost (recall 0.747) is
+stated alongside its benefit (0 of 22 hard negatives accepted).
 
 ---
 
@@ -326,3 +352,35 @@ reveal the weakness a phone test found. The one hard negative v3 still accepts
 is a pen from that phone test (0.967 under v2, 0.825 under v3). All 8
 field-condition cigarette photographs in test pass under both models. Single
 training run; seed variance for v3 is not yet measured.
+
+### Strict operating point — threshold 0.90 and a sharpness check
+
+After a fresh pen photograph (0.827) still passed under v3 at 0.71, the
+operating point was raised to **0.90** as a deliberate policy: only clear
+photographs of a lit cigarette should be accepted, and a retake is an accepted
+cost. This is **not** the output of the validation rule, which gives 0.71 and
+sees no false positives to remove above it. 0.90 was fixed before test was
+read at it, and should be described in the report as a policy choice.
+
+A measured blur check was added at the same time (`AI_MIN_SHARPNESS`,
+`inference.sharpness`): variance of the Laplacian at a 512 px long side. A
+photograph below the cutoff fails as "Image too blurry" whatever it scores,
+and a sharp photograph is no longer blamed on blur. The cutoff of **20** was
+calibrated on validation: it rejects 0 of 148 genuine smoking photographs and
+catches 97% of copies blurred with a Gaussian of radius 2 (100% at radius 4).
+
+| vit-scope-v3, test split (323 images) | 0.71 | **0.90 + sharpness 20** |
+|---|---|---|
+| Precision | 0.978 | **1.000** (95% CI 0.967–1.000) |
+| Recall | 0.880 | **0.747** (95% CI 0.672–0.810) |
+| FP / FN | 3 / 18 | **0 / 38** |
+| Hard negatives accepted | 1 / 22 | **0 / 22** |
+| Field lit-cigarette photos accepted | 8 / 8 | 6 / 8 |
+| Genuine photos rejected for blur alone | — | 0 |
+
+At the report level (up to three photographs, one needed), 0% of invalid
+reports reach enforcement and 1.6% of genuine three-photo reports are
+rejected, but a single-photograph genuine report is rejected about 1 time in
+4. The sharpness check catches blur only; it does not detect a photograph of a
+screen, and an unlit cigarette is not a training negative — both remain
+limitations until a v4 dataset includes them.
