@@ -249,11 +249,12 @@ photos taken at a distance in a Malaysian food court. Real submissions will be
 further from the camera, more motion-blurred, and worse lit. Measured accuracy
 on this test set is an **upper bound** on field performance.
 
-**Failure reasons are heuristic.** The model is a single-label classifier: it
-reports how confident it is that a violation is present, not *why* it is
-unconvinced. The "too blurry" / "too far" messages are presentational bands
-over the confidence score, not measurements. Deriving blur from a Laplacian
-variance check and distance from a detection bounding box would make them real.
+**Failure reasons are partly heuristic.** Blur is measured: a photograph below
+the sharpness cutoff fails as "Image too blurry" on a variance-of-Laplacian
+measurement, not on its score. "Too far" and "no lit cigarette" are still
+presentational bands over the confidence score, because a single-label
+classifier reports how sure it is, not why. Distance from a detection bounding
+box would make "too far" a measurement too.
 
 **No human check.** FR12 was removed, so a false positive reaches enforcement
 uncorrected. The defence is that the threshold is tuned to minimise exactly
@@ -272,10 +273,26 @@ interval on precision is roughly ±0.03. Averaging over training seeds does not
 narrow that — only more labelled test data would. Both sources of uncertainty
 should be stated; neither alone answers "how much of this is luck".
 
-**The published threshold was selected on the test split.** Until the model is
-retrained and the validation-first procedure in section 5 is run end to end,
-the reported precision of 0.977 is an upper bound on itself. The procedure is
-implemented; the figures are not yet re-measured under it.
+**A photograph of a screen showing a lit cigarette is accepted.** The model
+judges what the picture shows, not whether it is a real scene: a phone photo of
+a laptop playing a cigarette stock video scored 0.932 and passed both the 0.90
+threshold and the sharpness check (screens photograph sharply). No photographs
+of screens are in the training negatives. This is **accepted deliberately**:
+the live demonstration is held indoors, where lighting a real cigarette would
+be unsafe and unhealthy, so the demo photographs a lit cigarette on a screen.
+Misuse to fabricate a report is bounded by camera-only capture at S08 and the
+per-device limit of 5 reports per hour. The fix, if needed, is a v4 dataset
+with photographs of screens labelled as non-smoking; a hand-written moiré
+detector was considered and rejected as too sensitive to angle and distance.
+
+**An unlit cigarette is not a training negative.** The model learned "smoking"
+from photographs that are mostly lit, but was never shown an unlit cigarette
+held the same way, so it may accept one. Like screens, this needs v4 data.
+
+**The 0.90 threshold is a policy, not a rule output.** The validation-first
+procedure gives 0.71 for vit-scope-v3. 0.90 was set above it deliberately for
+strictness and fixed before test was scored at it; its cost (recall 0.747) is
+stated alongside its benefit (0 of 22 hard negatives accepted).
 
 ---
 
