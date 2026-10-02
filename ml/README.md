@@ -326,3 +326,35 @@ reveal the weakness a phone test found. The one hard negative v3 still accepts
 is a pen from that phone test (0.967 under v2, 0.825 under v3). All 8
 field-condition cigarette photographs in test pass under both models. Single
 training run; seed variance for v3 is not yet measured.
+
+### Strict operating point — threshold 0.90 and a sharpness check
+
+After a fresh pen photograph (0.827) still passed under v3 at 0.71, the
+operating point was raised to **0.90** as a deliberate policy: only clear
+photographs of a lit cigarette should be accepted, and a retake is an accepted
+cost. This is **not** the output of the validation rule, which gives 0.71 and
+sees no false positives to remove above it. 0.90 was fixed before test was
+read at it, and should be described in the report as a policy choice.
+
+A measured blur check was added at the same time (`AI_MIN_SHARPNESS`,
+`inference.sharpness`): variance of the Laplacian at a 512 px long side. A
+photograph below the cutoff fails as "Image too blurry" whatever it scores,
+and a sharp photograph is no longer blamed on blur. The cutoff of **20** was
+calibrated on validation: it rejects 0 of 148 genuine smoking photographs and
+catches 97% of copies blurred with a Gaussian of radius 2 (100% at radius 4).
+
+| vit-scope-v3, test split (323 images) | 0.71 | **0.90 + sharpness 20** |
+|---|---|---|
+| Precision | 0.978 | **1.000** (95% CI 0.967–1.000) |
+| Recall | 0.880 | **0.747** (95% CI 0.672–0.810) |
+| FP / FN | 3 / 18 | **0 / 38** |
+| Hard negatives accepted | 1 / 22 | **0 / 22** |
+| Field lit-cigarette photos accepted | 8 / 8 | 6 / 8 |
+| Genuine photos rejected for blur alone | — | 0 |
+
+At the report level (up to three photographs, one needed), 0% of invalid
+reports reach enforcement and 1.6% of genuine three-photo reports are
+rejected, but a single-photograph genuine report is rejected about 1 time in
+4. The sharpness check catches blur only; it does not detect a photograph of a
+screen, and an unlit cigarette is not a training negative — both remain
+limitations until a v4 dataset includes them.

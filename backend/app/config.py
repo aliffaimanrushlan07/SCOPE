@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     ai_model_path: str = "../ml/artifacts/vit-scope-v1.keras"
     ai_request_timeout_seconds: int = 30
 
+    # Photographs whose variance-of-Laplacian sharpness (measured at a 512 px
+    # long side) falls below this are rejected as "Image too blurry" whatever
+    # the classifier scores. 0 disables the check. Read per request, like the
+    # threshold, so it can be retuned without a new mobile build.
+    ai_min_sharpness: float = 0.0
+
     # Forces the deterministic stub even when a model file is present. Useful
     # for running the app without loading a gigabyte of weights; scores are
     # then meaningless and must never be presented as real results.
