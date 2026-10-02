@@ -267,13 +267,14 @@ photographs, including 0 of 22 hard negatives (95% CI on precision
 0.967–1.000). The dashboard is also advisory: it informs patrol planning rather
 than triggering enforcement against a named party.
 
-**Single training run for v3.** vit-scope-v2 was retrained across 3 seeds
-(precision 0.975 ± 0.008, `artifacts/seed_study.txt`); vit-scope-v3 has not
-been, so its figures carry the variance of one run. Section 11 of the notebook
-and `aggregate_seeds.py` measure that spread; until they are run for v3, quote
-the confidence intervals `select_threshold.py` prints and say the seed
-variance is unmeasured. The v3 test split has also been read twice — at 0.71
-and at 0.90, both fixed beforehand — so it must not be used to tune again.
+**Seed variance is measured, but on the notebook's pipeline.** v3 was
+retrained across 3 seeds on the same split (`artifacts/seeds/`; v2's runs are
+kept in `artifacts/seeds_v2/`). The seed runs are scored inside the notebook on
+the 256 px Colab bundle, not through the backend, so individual scores differ
+from the deployed model's (one photograph: 0.91–0.94 in the seed runs, 0.821
+in the backend). Use them for the spread, never in place of the headline
+figures. The v3 test split has been read at 0.71 and 0.90, both fixed
+beforehand, so it must not be used to tune again.
 
 **The test split is small.** With 173 non-smoking images, the 95% confidence
 interval on precision is still a few points wide (0.967–1.000 at 0.90), and
@@ -377,6 +378,26 @@ catches 97% of copies blurred with a Gaussian of radius 2 (100% at radius 4).
 | Hard negatives accepted | 1 / 22 | **0 / 22** |
 | Field lit-cigarette photos accepted | 8 / 8 | 6 / 8 |
 | Genuine photos rejected for blur alone | — | 0 |
+
+**Seed study (3 runs, same split, notebook pipeline — see Limitations).**
+
+| At the fixed 0.90 policy | Mean ± SD |
+|---|---|
+| Precision | 0.991 ± 0.000 (1 FP in every run) |
+| Recall | 0.731 ± 0.032 |
+| F1 | 0.841 ± 0.021 |
+| PR-AUC | 0.991 ± 0.001 |
+| Hard negatives accepted | 0 / 22 in every run |
+| Field lit-cigarette photos accepted | 7 / 8 in every run |
+
+The one false positive is the same image in all three runs: a mirror selfie
+with a phone held at the mouth (`train_notsmoking_0084.jpg`), which the
+deployed model scores 0.821 and rejects. With each run's threshold chosen on
+its own validation split instead (target precision 1.00,
+`artifacts/seed_study_v3.txt`), precision is 0.983 ± 0.004 and recall
+0.880 ± 0.029 at a threshold of 0.713 ± 0.076. In both cases the seed spread
+on precision is smaller than the test-split sampling half-width (~0.027), so
+more labelled test data, not more seeds, would narrow the figure.
 
 At the report level (up to three photographs, one needed), 0% of invalid
 reports reach enforcement and 1.6% of genuine three-photo reports are
