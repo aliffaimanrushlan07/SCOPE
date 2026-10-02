@@ -38,7 +38,8 @@ WHERE conname IN (
     'report_photo_sequence_unique',
     'ai_classification_outcome_valid',  -- only PASS is persisted
     'ai_classification_passed_range',   -- at least one photo passed
-    'infographic_slot_range',           -- three fixed slots
+    'infographic_slot_range',           -- two fixed slots
+    'infographic_published_pair',       -- title and image set or cleared together
     'admin_user_role_valid',
     'admin_activity_log_type_valid'
 )
@@ -51,7 +52,7 @@ FROM pg_indexes
 WHERE tablename = 'report' AND indexname = 'idx_report_geom';
 
 \echo ''
-\echo '=== Seeded infographic slots (expect exactly 3) ==='
+\echo '=== Seeded infographic slots (expect exactly 2) ==='
 SELECT infographic_id, title FROM infographic ORDER BY infographic_id;
 
 \echo ''

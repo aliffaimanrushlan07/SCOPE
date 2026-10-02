@@ -34,17 +34,14 @@ INSERT INTO admin_user (email, password_hash, full_name, organisation, role) VAL
 -- ---------------------------------------------------------------------
 -- Infographic slots (Table 4.9)
 --
--- All three rows must exist from first boot. The mobile Home carousel
--- (S02) renders exactly three slides and the Awareness Hub (S04) exactly
--- three buttons; neither screen has an empty state for a missing slot.
+-- Both rows must exist from first boot: D06 edits and empties slots in
+-- place but never creates them.
 --
--- Titles match the three topics specified in
+-- Titles match two of the topics specified in
 -- SCOPE-System-Flow-Revised.md section S02.
 -- ---------------------------------------------------------------------
 INSERT INTO infographic (infographic_id, title, image_path, source_filename) VALUES
-    (1, 'How SCOPE Reporting Works',
+    (1, 'Smoking Violation Law in Malaysia',
         'infographics/slot-1-placeholder.png', 'slot-1-placeholder.png'),
-    (2, 'Smoking Violation Law in Malaysia',
-        'infographics/slot-2-placeholder.png', 'slot-2-placeholder.png'),
-    (3, 'Effects of Second-Hand Smoke on Non-Smokers',
-        'infographics/slot-3-placeholder.png', 'slot-3-placeholder.png');
+    (2, 'Effects of Second-Hand Smoke on Non-Smokers',
+        'infographics/slot-2-placeholder.png', 'slot-2-placeholder.png');

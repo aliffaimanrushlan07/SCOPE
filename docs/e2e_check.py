@@ -222,7 +222,9 @@ check("detail NOT readable by another device", r.status_code == 404)
 print("\nS02/S04/S06 — public content")
 # ---------------------------------------------------------------------------
 r = httpx.get(f"{BASE}/api/v1/infographics", timeout=30)
-check("exactly three infographic slots", r.status_code == 200 and len(r.json()) == 3)
+check("at most two published infographic slots", r.status_code == 200 and len(r.json()) <= 2)
+check("public infographics never include an empty slot",
+      all(i["image_path"] and i["title"] for i in r.json()))
 
 r = httpx.get(f"{BASE}/api/v1/hotspots", timeout=30)
 check("hotspots returns density points", r.status_code == 200 and len(r.json()) >= 1)
@@ -308,9 +310,9 @@ infographic_writes = [
     f"{m.upper()} {p}"
     for p, ops in spec["paths"].items()
     for m in ops
-    if m in {"post", "delete"} and "infographics" in p
+    if m == "post" and "infographics" in p
 ]
-check("NO create/delete endpoint on infographics (three fixed slots)",
+check("NO create endpoint on infographics (two fixed slots)",
       not infographic_writes, str(infographic_writes))
 
 # ---------------------------------------------------------------------------

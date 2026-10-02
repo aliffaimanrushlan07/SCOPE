@@ -6,16 +6,13 @@ import { ErrorState, Loading, Notice, TopBar, formatDateTime } from '../componen
 /**
  * D06 — Infographic Management.
  *
- * THREE FIXED SLOTS, replace-in-place only. There is no "add slot" and no
- * delete, because the mobile Home carousel (S02) renders exactly three
- * pagination dots and the Awareness Hub (S04) exactly three buttons — neither
- * has an empty or overflow state, so a fourth slot or a deletion would break
- * both screens.
+ * TWO FIXED SLOTS. Each can be replaced in place or deleted. Deleting empties
+ * the slot rather than removing it, so the card stays and the administrator
+ * can publish a new infographic into it. The mobile Awareness Hub (S04) lists
+ * published slots only.
  *
- * The constraint is stated in the banner rather than left implicit, so an
- * administrator is not left hunting for a delete button that was never built.
- * It is also enforced by the database: the primary key is a CHECK-constrained
- * slot number and a trigger blocks DELETE.
+ * The slot count is enforced by the database: the primary key is a
+ * CHECK-constrained slot number and a trigger blocks row deletion.
  */
 export default function Infographics() {
   const [slots, setSlots] = useState([])
@@ -39,11 +36,10 @@ export default function Infographics() {
       <TopBar title="Infographics" />
 
       <div className="page">
-        <Notice title="Three fixed slots">
-          These three infographics appear in the mobile app's Awareness Hub.
-          You can replace the image and edit the title of each slot, but slots
-          cannot be added or deleted — that screen is built around exactly
-          three.
+        <Notice title="Two slots">
+          Published infographics appear in the mobile app's Awareness Hub. You
+          can replace the image, edit the title or delete each one. A deleted
+          slot stays here, empty, so you can publish a new infographic into it.
         </Notice>
 
         {loading ? (
@@ -69,15 +65,22 @@ export default function Infographics() {
 }
 
 function SlotCard({ slot, onSaved }) {
-  const [title, setTitle] = useState(slot.title)
+  const savedTitle = slot.title ?? ''
+  const empty = slot.image_path == null
+  const [title, setTitle] = useState(savedTitle)
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
   const inputRef = useRef(null)
 
-  const dirty = title !== slot.title || file != null
+  // Follow the server after a reload, e.g. the title clearing on delete.
+  useEffect(() => setTitle(savedTitle), [savedTitle])
+
+  const dirty = title !== savedTitle || file != null
+  const busy = saving || deleting
 
   const handleFile = (event) => {
     const chosen = event.target.files?.[0]
@@ -103,8 +106,28 @@ function SlotCard({ slot, onSaved }) {
     }
   }
 
+  const handleDelete = async () => {
+    const ok = window.confirm(
+      `Delete "${slot.title}" from slot ${slot.infographic_id}? ` +
+        'It will disappear from the mobile app straight away.',
+    )
+    if (!ok) return
+    setDeleting(true)
+    setError('')
+    try {
+      await api.deleteInfographic(slot.infographic_id)
+      handleReset()
+      setSaved(false)
+      onSaved()
+    } catch (err) {
+      setError(errorMessage(err, 'The slot could not be deleted.'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const handleReset = () => {
-    setTitle(slot.title)
+    setTitle(savedTitle)
     setFile(null)
     setPreview(null)
     setError('')
@@ -122,10 +145,17 @@ function SlotCard({ slot, onSaved }) {
         }}
       >
         <strong style={{ fontSize: 14 }}>Slot {slot.infographic_id}</strong>
-        {saved && !dirty && (
+        {empty ? (
           <span className="muted" style={{ fontSize: 12 }}>
-            Saved
+            Empty
           </span>
+        ) : (
+          saved &&
+          !dirty && (
+            <span className="muted" style={{ fontSize: 12 }}>
+              Saved
+            </span>
+          )
         )}
       </div>
 
@@ -143,7 +173,7 @@ function SlotCard({ slot, onSaved }) {
         {preview || slot.image_path ? (
           <img
             src={preview ?? mediaUrl(slot.image_path)}
-            alt={slot.title}
+            alt={title}
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onError={(e) => {
               e.currentTarget.style.display = 'none'
@@ -151,7 +181,7 @@ function SlotCard({ slot, onSaved }) {
           />
         ) : (
           <span className="muted" style={{ fontSize: 13 }}>
-            No image
+            {empty ? 'Empty slot — choose an image to publish' : 'No image'}
           </span>
         )}
       </div>
@@ -171,7 +201,7 @@ function SlotCard({ slot, onSaved }) {
 
       <div className="muted" style={{ fontSize: 12, marginBottom: 10, lineHeight: 1.5 }}>
         {slot.updated_at
-          ? `Last updated ${formatDateTime(slot.updated_at)}`
+          ? `${empty ? 'Deleted' : 'Last updated'} ${formatDateTime(slot.updated_at)}`
           : 'Never updated'}
         <br />
         Portrait 3:4, minimum 1080 × 1440 recommended.
@@ -194,19 +224,29 @@ function SlotCard({ slot, onSaved }) {
       />
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button className="btn" onClick={() => inputRef.current?.click()}>
-          Replace image
+        <button className="btn" onClick={() => inputRef.current?.click()} disabled={busy}>
+          {empty ? 'Choose image' : 'Replace image'}
         </button>
         <button
           className="btn btn-primary"
           onClick={handleSave}
-          disabled={!dirty || saving || !title.trim()}
+          disabled={!dirty || busy || !title.trim() || (empty && !file)}
         >
           {saving ? 'Saving…' : 'Publish'}
         </button>
         {dirty && (
-          <button className="btn" onClick={handleReset} disabled={saving}>
+          <button className="btn" onClick={handleReset} disabled={busy}>
             Cancel
+          </button>
+        )}
+        {!empty && (
+          <button
+            className="btn btn-danger"
+            onClick={handleDelete}
+            disabled={busy}
+            style={{ marginLeft: 'auto' }}
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
           </button>
         )}
       </div>

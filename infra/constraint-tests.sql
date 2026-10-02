@@ -100,17 +100,23 @@ VALUES ('22222222-2222-2222-2222-222222222222', 'vit-scope-v1', 0.8500, 'PASS',
 
 -- ---------------------------------------------------------------------
 \echo ''
-\echo '=== TEST 9 — EXPECT FAIL: a fourth infographic slot ==='
+\echo '=== TEST 9 — EXPECT FAIL: a third infographic slot ==='
 -- ---------------------------------------------------------------------
 INSERT INTO infographic (infographic_id, title, image_path)
-VALUES (4, 'A fourth slot', 'infographics/slot-4.png');
+VALUES (3, 'A third slot', 'infographics/slot-3.png');
 
 -- ---------------------------------------------------------------------
 \echo ''
-\echo '=== TEST 10 — EXPECT FAIL: deleting an infographic slot ==='
-\echo '    S02 renders three carousel dots and S04 three buttons; neither has an empty state.'
+\echo '=== TEST 10 — EXPECT FAIL: deleting an infographic slot row ==='
+\echo '    D06 empties a slot instead, so it can be published into again.'
 -- ---------------------------------------------------------------------
-DELETE FROM infographic WHERE infographic_id = 3;
+DELETE FROM infographic WHERE infographic_id = 2;
+
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== TEST 10b — EXPECT FAIL: a half-empty infographic slot ==='
+-- ---------------------------------------------------------------------
+UPDATE infographic SET image_path = NULL WHERE infographic_id = 2;
 
 -- ---------------------------------------------------------------------
 \echo ''

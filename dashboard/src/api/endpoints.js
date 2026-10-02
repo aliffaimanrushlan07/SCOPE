@@ -87,9 +87,8 @@ export const getReport = (reportId) =>
 export const listInfographics = () =>
   client.get('/admin/infographics').then((r) => r.data)
 
-/** Replace-in-place only. There is no create and no delete: the mobile
- *  carousel renders exactly three slides and the Awareness Hub three buttons,
- *  neither of which has an empty or overflow state. */
+/** Replace a slot's title and, optionally, its image. Publishing into an
+ *  empty slot requires an image. */
 export const updateInfographic = (slot, { title, image }) => {
   const form = new FormData()
   form.append('title', title)
@@ -98,3 +97,7 @@ export const updateInfographic = (slot, { title, image }) => {
     .put(`/admin/infographics/${slot}`, form)
     .then((r) => r.data)
 }
+
+/** Empty a slot. The slot itself stays and can be published into again. */
+export const deleteInfographic = (slot) =>
+  client.delete(`/admin/infographics/${slot}`).then((r) => r.data)

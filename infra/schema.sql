@@ -211,7 +211,8 @@ CREATE TABLE admin_activity_log (
     CONSTRAINT admin_activity_log_type_valid
         CHECK (activity_type IN (
             'LOGIN', 'LOGOUT', 'FAILED_LOGIN',
-            'VIEW_REPORT', 'EXPORT_CSV', 'UPDATE_INFOGRAPHIC'
+            'VIEW_REPORT', 'EXPORT_CSV', 'UPDATE_INFOGRAPHIC',
+            'DELETE_INFOGRAPHIC'
         ))
 );
 
@@ -229,34 +230,37 @@ CREATE INDEX idx_admin_activity_log_activity_at ON admin_activity_log (activity_
 
 -- ---------------------------------------------------------------------
 -- Table 4.9 — INFOGRAPHIC
--- The three fixed awareness slots managed at D06 and rendered in the
--- mobile Home carousel (S02) and Awareness Hub (S04).
+-- The two fixed awareness slots managed at D06 and rendered in the
+-- mobile Awareness Hub (S04).
 -- The primary key is a fixed slot number rather than a generated
--- identifier, enforcing the three-slot constraint the mobile layouts
--- depend upon.
+-- identifier, so the slot set never grows. A slot is either published
+-- (title and image both set) or empty (both NULL): D06 "deletes" an
+-- infographic by emptying its slot, and S04 lists published slots only.
 -- ---------------------------------------------------------------------
 CREATE TABLE infographic (
     infographic_id  SMALLINT     PRIMARY KEY,
-    title           VARCHAR(120) NOT NULL,
-    image_path      VARCHAR(255) NOT NULL,
+    title           VARCHAR(120),
+    image_path      VARCHAR(255),
     source_filename VARCHAR(150),
     updated_by      UUID         REFERENCES admin_user(admin_id) ON DELETE SET NULL,
     updated_at      TIMESTAMPTZ,
 
     CONSTRAINT infographic_slot_range
-        CHECK (infographic_id BETWEEN 1 AND 3)
+        CHECK (infographic_id BETWEEN 1 AND 2),
+    CONSTRAINT infographic_published_pair
+        CHECK ((title IS NULL) = (image_path IS NULL))
 );
 
 COMMENT ON TABLE infographic IS
-    'Three fixed slots. D06 replaces image and title in place; slots cannot be added or deleted because S02 renders exactly three carousel dots and S04 exactly three buttons.';
+    'Two fixed slots. D06 replaces image and title in place, or empties a slot; the rows themselves are never added or deleted.';
 
--- D06 offers replace-in-place only. Deleting a slot would break S02 and
--- S04, which have no empty state. Blocking DELETE here means the
--- constraint holds even against direct database access.
+-- D06 empties a slot rather than deleting its row, so the slot can be
+-- published into again. Blocking DELETE keeps both rows present even
+-- against direct database access.
 CREATE OR REPLACE FUNCTION infographic_block_delete() RETURNS trigger AS $$
 BEGIN
     RAISE EXCEPTION
-        'Infographic slots are fixed at three and cannot be deleted. Replace the image and title instead (D06).';
+        'Infographic slots are fixed at two and their rows cannot be deleted. Empty the slot instead (D06).';
 END;
 $$ LANGUAGE plpgsql;
 

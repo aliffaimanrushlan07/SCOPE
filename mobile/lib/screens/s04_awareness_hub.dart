@@ -8,14 +8,16 @@ import '../widgets/infographic_viewer.dart';
 
 /// S04 — Awareness Hub.
 ///
-/// Three buttons, one per infographic slot, each with its topic and a
+/// One button per published infographic slot, each with its topic and a
 /// thumbnail. Tapping opens the floating viewer (S05).
 ///
 /// This is now the only way into the infographics: Home used to preview
 /// them in a carousel and carries a fixed poster instead.
 ///
-/// The count is fixed at three by the data model — the D06 slots are keyed 1-3
-/// and the database rejects a fourth — so this screen needs no overflow state.
+/// There are at most two — the D06 slots are keyed 1-2 and the database
+/// rejects a third — so this screen needs no overflow state. An administrator
+/// can empty a slot, though, and the API leaves empty slots out, so the list
+/// can be shorter or empty.
 class AwarenessHubScreen extends StatefulWidget {
   const AwarenessHubScreen({super.key});
 
@@ -47,8 +49,12 @@ class _AwarenessHubScreenState extends State<AwarenessHubScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (snapshot.hasError || (snapshot.data?.isEmpty ?? true)) {
+          if (snapshot.hasError || snapshot.data == null) {
             return _ErrorState(onRetry: _reload);
+          }
+
+          if (snapshot.data!.isEmpty) {
+            return _EmptyState(onRetry: _reload);
           }
 
           final items = snapshot.data!;
@@ -144,6 +150,36 @@ class _ErrorState extends StatelessWidget {
             ),
             const SizedBox(height: Gap.md),
             OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(Gap.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.collections_outlined,
+                size: 44, color: ScopeTheme.inkMuted),
+            const SizedBox(height: Gap.md),
+            const Text(
+              'No awareness content has been published yet.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: ScopeTheme.inkMuted),
+            ),
+            const SizedBox(height: Gap.md),
+            OutlinedButton(onPressed: onRetry, child: const Text('Refresh')),
           ],
         ),
       ),

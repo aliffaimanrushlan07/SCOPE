@@ -22,11 +22,16 @@ _PUBLIC_PRECISION = 3
 @router.get(
     "/infographics",
     response_model=list[InfographicOut],
-    summary="The three awareness slots (S02 carousel, S04 hub)",
+    summary="The published awareness slots (S04 hub)",
 )
 def list_infographics(db: Session = Depends(get_db)) -> list[Infographic]:
+    # Empty slots are left out, so S04 only ever sees complete infographics.
     return list(
-        db.scalars(select(Infographic).order_by(Infographic.infographic_id)).all()
+        db.scalars(
+            select(Infographic)
+            .where(Infographic.image_path.is_not(None))
+            .order_by(Infographic.infographic_id)
+        ).all()
     )
 
 

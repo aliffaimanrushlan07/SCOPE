@@ -251,7 +251,7 @@ Future<void> _showNavigationMenu(BuildContext context) {
 
 /// The Home poster.
 ///
-/// Standing artwork, not a preview: the three awareness infographics this
+/// Standing artwork, not a preview: the awareness infographics this
 /// replaced are still one tap away in the Awareness Hub (S04), so Home no
 /// longer needs to page through them. Being a bundled asset it has no
 /// loading, error or offline state, which is the point — Home is the screen

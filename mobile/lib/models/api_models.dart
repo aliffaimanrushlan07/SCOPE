@@ -101,7 +101,7 @@ class SubmissionResult {
       );
 }
 
-/// One of the three fixed awareness slots (S04 hub).
+/// One published awareness slot (S04 hub). The API never sends empty slots.
 class Infographic {
   const Infographic({
     required this.id,
