@@ -211,7 +211,7 @@
         "tags": [
           "Public content"
         ],
-        "summary": "The three awareness slots (S02 carousel, S04 hub)",
+        "summary": "The published awareness slots (S04 hub)",
         "operationId": "list_infographics_api_v1_infographics_get",
         "responses": {
           "200": {
@@ -827,6 +827,93 @@
         }
       }
     },
+    "/api/v1/admin/analytics/timing": {
+      "get": {
+        "tags": [
+          "Admin \u2014 Analytics"
+        ],
+        "summary": "Patrol timing by day and time of day (D02)",
+        "description": "When violations happen, for all locations or one hotspot.\n\nThe period window is applied to ``submitted_at``, exactly as the overview\ndoes, so a location's total here matches its count in Top hotspot\nlocations. The bucketing then uses ``reported_at`` \u2014 when the violation was\nphotographed \u2014 because that, not when the reporter pressed submit, is what\na patrol needs to be present for.\n\n``lat``/``lng`` select one location by the same three-decimal grid (about\n110 m) that groups Top hotspot locations.",
+        "operationId": "timing_api_v1_admin_analytics_timing_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          },
+          {
+            "name": "lat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 90,
+                  "minimum": -90
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lat"
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 180,
+                  "minimum": -180
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lng"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/hotspots/clusters": {
       "get": {
         "tags": [
@@ -899,7 +986,7 @@
         "tags": [
           "Admin \u2014 Infographics"
         ],
-        "summary": "The three slots (D06)",
+        "summary": "The two slots (D06)",
         "operationId": "list_slots_api_v1_admin_infographics_get",
         "responses": {
           "200": {
@@ -908,7 +995,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/InfographicOut"
+                    "$ref": "#/components/schemas/AdminInfographicOut"
                   },
                   "type": "array",
                   "title": "Response List Slots Api V1 Admin Infographics Get"
@@ -943,12 +1030,12 @@
             "required": true,
             "schema": {
               "type": "integer",
-              "maximum": 3,
+              "maximum": 2,
               "minimum": 1,
-              "description": "Fixed slot number; only 1, 2 or 3 exist.",
+              "description": "Fixed slot number; only 1 or 2 exist.",
               "title": "Slot"
             },
-            "description": "Fixed slot number; only 1, 2 or 3 exist."
+            "description": "Fixed slot number; only 1 or 2 exist."
           }
         ],
         "requestBody": {
@@ -967,7 +1054,56 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InfographicOut"
+                  "$ref": "#/components/schemas/AdminInfographicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin \u2014 Infographics"
+        ],
+        "summary": "Empty a slot, removing its image and title (D06)",
+        "operationId": "delete_slot_api_v1_admin_infographics__slot__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2,
+              "minimum": 1,
+              "description": "Fixed slot number; only 1 or 2 exist.",
+              "title": "Slot"
+            },
+            "description": "Fixed slot number; only 1 or 2 exist."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInfographicOut"
                 }
               }
             }
@@ -1013,6 +1149,57 @@
   },
   "components": {
     "schemas": {
+      "AdminInfographicOut": {
+        "properties": {
+          "infographic_id": {
+            "type": "integer",
+            "title": "Infographic Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "image_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Path"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "infographic_id",
+          "title",
+          "image_path",
+          "updated_at"
+        ],
+        "title": "AdminInfographicOut",
+        "description": "D06 view of a slot. Unlike the public listing it includes empty slots,\nwhose title and image_path are null."
+      },
       "AdminOut": {
         "properties": {
           "admin_id": {
@@ -2122,6 +2309,122 @@
           "count"
         ],
         "title": "TimeSeriesPoint"
+      },
+      "TimingCategory": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "start_hour": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Start Hour"
+          },
+          "end_hour": {
+            "type": "integer",
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "End Hour"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "start_hour",
+          "end_hour",
+          "count"
+        ],
+        "title": "TimingCategory",
+        "description": "A named time-of-day slot built from whole two-hour blocks."
+      },
+      "TimingPeak": {
+        "properties": {
+          "day": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Day",
+            "description": "0 = Monday \u2026 6 = Sunday."
+          },
+          "block": {
+            "type": "integer",
+            "maximum": 11.0,
+            "minimum": 0.0,
+            "title": "Block",
+            "description": "Two-hour block; 0 = 00:00\u201302:00."
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "block",
+          "count"
+        ],
+        "title": "TimingPeak"
+      },
+      "TimingResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "grid": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Grid",
+            "description": "7 rows (Monday first) x 12 two-hour blocks (00:00 first)."
+          },
+          "by_day": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "By Day",
+            "description": "Seven totals, Monday first."
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/TimingCategory"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "peak": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimingPeak"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "grid",
+          "by_day",
+          "categories",
+          "peak"
+        ],
+        "title": "TimingResponse",
+        "description": "D02 patrol-timing panel: when violations are reported, in Malaysian time.\n\nBucketed by ``reported_at`` (the moment the violation was photographed),\nnot ``submitted_at``. Days are calendar days: a report at 01:00 Saturday\nsits on the Saturday row."
       },
       "TopLocation": {
         "properties": {

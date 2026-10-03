@@ -36,6 +36,9 @@ ml/artifacts/
 # --- Backend uploads ---
 backend/uploads/
 
+# --- Demo data: the presenter's own photographs of real people smoking ---
+infra/demo/real-photos/
+
 # --- macOS / editors ---
 .DS_Store
 .idea/

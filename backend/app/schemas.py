@@ -243,6 +243,38 @@ class OverviewResponse(BaseModel):
     top_locations: list[TopLocation]
 
 
+class TimingCategory(BaseModel):
+    """A named time-of-day slot built from whole two-hour blocks."""
+
+    label: str
+    start_hour: int = Field(ge=0, le=23)
+    end_hour: int = Field(ge=1, le=24)
+    count: int
+
+
+class TimingPeak(BaseModel):
+    day: int = Field(ge=0, le=6, description="0 = Monday … 6 = Sunday.")
+    block: int = Field(ge=0, le=11, description="Two-hour block; 0 = 00:00–02:00.")
+    count: int
+
+
+class TimingResponse(BaseModel):
+    """D02 patrol-timing panel: when violations are reported, in Malaysian time.
+
+    Bucketed by ``reported_at`` (the moment the violation was photographed),
+    not ``submitted_at``. Days are calendar days: a report at 01:00 Saturday
+    sits on the Saturday row.
+    """
+
+    total: int
+    grid: list[list[int]] = Field(
+        description="7 rows (Monday first) x 12 two-hour blocks (00:00 first)."
+    )
+    by_day: list[int] = Field(description="Seven totals, Monday first.")
+    categories: list[TimingCategory]
+    peak: TimingPeak | None
+
+
 # ---------------------------------------------------------------------------
 # D03 — hotspot clusters
 # ---------------------------------------------------------------------------
