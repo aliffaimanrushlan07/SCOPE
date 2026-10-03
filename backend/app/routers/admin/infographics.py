@@ -13,6 +13,7 @@ against direct database access.
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, Request, UploadFile, status
 from sqlalchemy.orm import Session
@@ -85,6 +86,8 @@ async def update_slot(
         )
 
     infographic.title = title.strip()
+    old_image: str | None = None
+    new_file = None
 
     if image is not None:
         if image.content_type not in _ALLOWED_CONTENT_TYPES:
@@ -103,11 +106,14 @@ async def update_slot(
         suffix = {"image/png": ".png", "image/webp": ".webp"}.get(
             image.content_type or "", ".jpg"
         )
-        filename = f"slot-{slot}{suffix}"
-        (settings.infographics_path / filename).write_bytes(data)
-        if infographic.image_path != f"infographics/{filename}":
-            _remove_image(infographic.image_path)
+        # A new name on every upload. Reusing "slot-1.png" kept the URL
+        # unchanged, so the dashboard and the mobile app — both of which cache
+        # images by URL — went on showing the previous (or deleted) image.
+        filename = f"slot-{slot}-{uuid.uuid4().hex[:12]}{suffix}"
+        new_file = settings.infographics_path / filename
+        new_file.write_bytes(data)
 
+        old_image = infographic.image_path
         infographic.image_path = f"infographics/{filename}"
         infographic.source_filename = (image.filename or filename)[:150]
 
@@ -121,8 +127,17 @@ async def update_slot(
         request=request,
         detail=f"slot={slot} title={infographic.title}",
     )
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        if new_file is not None:
+            new_file.unlink(missing_ok=True)
+        raise
     db.refresh(infographic)
+
+    # After the commit, so a failed transaction never leaves a row pointing
+    # at a missing file.
+    _remove_image(old_image)
 
     return infographic
 

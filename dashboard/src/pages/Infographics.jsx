@@ -161,6 +161,7 @@ function SlotCard({ slot, onSaved }) {
 
       <div
         style={{
+          position: 'relative',
           background: 'var(--surface-2)',
           borderRadius: 8,
           height: 210,
@@ -171,10 +172,22 @@ function SlotCard({ slot, onSaved }) {
         }}
       >
         {preview || slot.image_path ? (
+          // Absolutely positioned so the box, not the image, sets the size:
+          // as a grid item, height: 100% did not resolve and a portrait
+          // infographic overflowed and was cropped. Keyed by its source so a
+          // new image gets a fresh element — onError hides the element, and
+          // that must not carry over to the next image.
           <img
+            key={preview ?? slot.image_path}
             src={preview ?? mediaUrl(slot.image_path)}
             alt={title}
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+            }}
             onError={(e) => {
               e.currentTarget.style.display = 'none'
             }}
