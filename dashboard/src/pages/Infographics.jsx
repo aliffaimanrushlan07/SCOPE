@@ -93,6 +93,11 @@ function SlotCard({ slot, onSaved }) {
 
   const dirty = title !== savedTitle || file != null
   const busy = saving || deleting
+  // Why Publish is unavailable, said out loud. A deleted slot also loses its
+  // title, so an image chosen for it cannot be published until one is typed,
+  // and a greyed-out button alone does not tell the administrator that.
+  const missing =
+    empty && !file ? 'Choose an image' : !title.trim() ? 'Enter a title' : null
 
   const handleFile = (event) => {
     const chosen = event.target.files?.[0]
@@ -259,7 +264,7 @@ function SlotCard({ slot, onSaved }) {
         <button
           className="btn btn-primary"
           onClick={handleSave}
-          disabled={!dirty || busy || !title.trim() || (empty && !file)}
+          disabled={!dirty || busy || missing != null}
         >
           {saving ? 'Saving…' : 'Publish'}
         </button>
@@ -279,6 +284,12 @@ function SlotCard({ slot, onSaved }) {
           </button>
         )}
       </div>
+
+      {dirty && missing && (
+        <div className="muted" role="status" style={{ fontSize: 12.5, marginTop: 8 }}>
+          {missing} to publish this slot.
+        </div>
+      )}
     </div>
   )
 }
