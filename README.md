@@ -115,6 +115,38 @@ With the database and API running:
 52 assertions covering the full reporting path (S10 → S13 → S14) and the
 administrative path (D01 → D05), including the design rules below.
 
+### 5. Demonstration data (simulated)
+
+The dashboard's trend, hotspot and patrol-timing panels need months of reports
+to show anything. `infra/demo/demo_data.py` writes **simulated** reports from
+1 June at nine real KL restaurants with outdoor dining, on a steady adoption
+curve, each with its own day-and-time pattern. Photographs come from the
+dataset and are scored by the real model, so only ones that pass the threshold
+are used. Every demo row has a `device_id` starting with `demo-`.
+
+Preview the monthly totals without writing anything:
+
+```bash
+./backend/.venv/bin/python infra/demo/demo_data.py plan --until 2026-10-19
+```
+
+Load them (repeatable, and it replaces the previous demo rows):
+
+```bash
+./backend/.venv/bin/python infra/demo/demo_data.py load --until 2026-10-19
+```
+
+Remove them:
+
+```bash
+./backend/.venv/bin/python infra/demo/demo_data.py remove
+```
+
+`--until` defaults to yesterday. Photographs you take yourself go in
+`infra/demo/real-photos/` (git-ignored, JPG or PNG). They are scored first and
+attached to the latest report at the busiest hotspots. `load` also clears the
+`E2E Test Food Court` rows that the end-to-end check leaves behind.
+
 ---
 
 ## Design constraints enforced in code

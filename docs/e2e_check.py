@@ -285,6 +285,16 @@ check("overview has NO pending/verified counts",
 check("overview carries the time series", len(overview["reports_over_time"]) >= 1)
 check("overview carries top locations", len(overview["top_locations"]) >= 1)
 
+r = httpx.get(f"{BASE}/api/v1/admin/analytics/timing", headers=auth,
+              params={"lat": payload["latitude"], "lng": payload["longitude"]}, timeout=30)
+check("patrol timing returned", r.status_code == 200, r.text[:200])
+timing = r.json()
+check("timing grid is 7 days x 12 two-hour blocks",
+      len(timing["grid"]) == 7 and all(len(row) == 12 for row in timing["grid"]))
+check("timing has the eight named time categories", len(timing["categories"]) == 8)
+# 10:30 UTC on Thursday 13 Aug is 18:30 in Kuala Lumpur: Thursday, 18:00-20:00.
+check("timing buckets in Malaysian time", timing["grid"][3][9] >= 1, str(timing["grid"][3]))
+
 r = httpx.get(f"{BASE}/api/v1/admin/hotspots/clusters", headers=auth, timeout=30)
 check("clusters returned with a band", r.status_code == 200 and r.json()[0]["band"] in (1, 2, 3, 4))
 

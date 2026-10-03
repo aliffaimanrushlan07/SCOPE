@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { addDays, endOfMonth, format, parseISO } from 'date-fns'
 import {
   Bar,
   BarChart,
@@ -10,14 +11,19 @@ import {
 } from 'recharts'
 import * as api from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import { ErrorState, Loading, TopBar, formatDate } from '../components/ui'
+import { ErrorState, Loading, TopBar } from '../components/ui'
+import PatrolTiming from '../components/PatrolTiming'
 import { PeriodSelect } from './HotspotMap'
 
 /**
  * D02 — Overview & Analytics (FR13).
  *
- * Four panels: total reports, reports over time, top hotspot locations, and
- * the period comparison.
+ * Five panels: total reports, reports over time, top hotspot locations, the
+ * period comparison, and patrol timing (when violations happen, by day and
+ * time of day, for all locations or one hotspot).
+ *
+ * Opens on weekly buckets over the last 12 months: the trend an officer plans
+ * patrols from, rather than a month of single days.
  *
  * Three panels from the original design are deliberately ABSENT: average AI
  * confidence, pending-review count and verified count. All three described a
@@ -29,8 +35,8 @@ import { PeriodSelect } from './HotspotMap'
  * text supplied by an unidentified reporter cannot support reliable grouping.
  */
 export default function Overview() {
-  const [days, setDays] = useState(30)
-  const [granularity, setGranularity] = useState('day')
+  const [days, setDays] = useState(365)
+  const [granularity, setGranularity] = useState('week')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -47,6 +53,37 @@ export default function Overview() {
   }, [days, granularity])
 
   useEffect(load, [load])
+
+  // Selected hotspot for the timing panel; null means all locations. Cleared
+  // when a period change drops it from the top-locations list it came from.
+  const [selected, setSelected] = useState(null)
+  const [timing, setTiming] = useState(null)
+  const [timingError, setTimingError] = useState('')
+
+  useEffect(() => {
+    if (
+      selected &&
+      data &&
+      !data.top_locations.some((l) => sameLocation(l, selected))
+    ) {
+      setSelected(null)
+    }
+  }, [data, selected])
+
+  useEffect(() => {
+    let cancelled = false
+    setTimingError('')
+    api
+      .timing({ days, latitude: selected?.latitude, longitude: selected?.longitude })
+      .then((result) => !cancelled && setTiming(result))
+      .catch(
+        (err) =>
+          !cancelled && setTimingError(errorMessage(err, 'Patrol timing could not be loaded.')),
+      )
+    return () => {
+      cancelled = true
+    }
+  }, [days, selected])
 
   const handleExport = async () => {
     setExporting(true)
@@ -120,7 +157,7 @@ export default function Overview() {
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart
                     data={data.reports_over_time.map((point) => ({
-                      label: formatDate(point.period),
+                      label: bucketLabel(point.period, granularity),
                       count: point.count,
                     }))}
                     margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
@@ -169,6 +206,7 @@ export default function Overview() {
                   </BarChart>
                 </ResponsiveContainer>
               )}
+              <PartialNote series={data.reports_over_time} granularity={granularity} />
             </section>
 
             <section className="card" style={{ padding: 18 }}>
@@ -180,7 +218,64 @@ export default function Overview() {
               {data.top_locations.length === 0 ? (
                 <div className="empty">No locations in this period.</div>
               ) : (
-                <TopLocations locations={data.top_locations} />
+                <TopLocations
+                  locations={data.top_locations}
+                  selected={selected}
+                  onSelect={(location) =>
+                    setSelected(sameLocation(location, selected) ? null : location)
+                  }
+                />
+              )}
+            </section>
+
+            <section className="card" style={{ padding: 18 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                  marginBottom: 14,
+                }}
+              >
+                <div>
+                  <h3 style={{ fontSize: 15, margin: '0 0 4px' }}>When violations happen</h3>
+                  <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+                    By day and time of day the violation was photographed — for
+                    deciding when to patrol or monitor.
+                  </p>
+                </div>
+                <select
+                  aria-label="Location"
+                  value={selected ? locationKey(selected) : ''}
+                  onChange={(e) =>
+                    setSelected(
+                      data.top_locations.find((l) => locationKey(l) === e.target.value) ?? null,
+                    )
+                  }
+                  style={{
+                    padding: '8px 11px',
+                    border: '1px solid var(--line)',
+                    borderRadius: 8,
+                    background: 'var(--white)',
+                    maxWidth: 320,
+                  }}
+                >
+                  <option value="">All locations</option>
+                  {data.top_locations.map((location) => (
+                    <option key={locationKey(location)} value={locationKey(location)}>
+                      {location.label} ({location.count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {timingError ? (
+                <ErrorState message={timingError} />
+              ) : !timing ? (
+                <Loading label="Loading patrol timing…" />
+              ) : (
+                <PatrolTiming timing={timing} />
               )}
             </section>
           </>
@@ -216,12 +311,59 @@ function StatCard({ label, value, delta, muted }) {
   )
 }
 
-function TopLocations({ locations }) {
+const locationKey = (location) => `${location.latitude},${location.longitude}`
+const sameLocation = (a, b) => Boolean(a && b) && locationKey(a) === locationKey(b)
+
+function bucketLabel(period, granularity) {
+  const date = parseISO(period)
+  return format(date, granularity === 'month' ? 'MMM yyyy' : 'd MMM')
+}
+
+/**
+ * Flags a final bar that is still filling up. Without it, a month or week
+ * that has only just begun reads as a sudden drop in violations.
+ */
+function PartialNote({ series, granularity }) {
+  if (granularity === 'day' || series.length === 0) return null
+  const start = parseISO(series[series.length - 1].period)
+  const end = granularity === 'week' ? addDays(start, 6) : endOfMonth(start)
+  const today = new Date()
+  if (today < start || today > addDays(end, 1)) return null
+
+  const sameMonth = start.getMonth() === today.getMonth()
+  const range = `${format(start, sameMonth ? 'd' : 'd MMM')}–${format(today, 'd MMM')}`
+  const text =
+    granularity === 'week'
+      ? `Week of ${format(start, 'd MMM')} is week to date (${range}).`
+      : `${format(start, 'MMMM')} is month to date (${range}).`
+  return (
+    <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 0' }}>
+      {text}
+    </p>
+  )
+}
+
+function TopLocations({ locations, selected, onSelect }) {
   const max = Math.max(...locations.map((l) => l.count))
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {locations.map((location) => (
-        <div key={`${location.latitude},${location.longitude}`}>
+        <button
+          type="button"
+          key={locationKey(location)}
+          onClick={() => onSelect(location)}
+          aria-pressed={sameLocation(location, selected)}
+          style={{
+            all: 'unset',
+            display: 'block',
+            cursor: 'pointer',
+            padding: '6px 8px',
+            margin: '0 -8px',
+            borderRadius: 8,
+            background: sameLocation(location, selected) ? 'var(--surface)' : 'transparent',
+            boxShadow: sameLocation(location, selected) ? 'inset 3px 0 0 var(--brand)' : 'none',
+          }}
+        >
           <div
             style={{
               display: 'flex',
@@ -246,7 +388,7 @@ function TopLocations({ locations }) {
               }}
             />
           </div>
-        </div>
+        </button>
       ))}
     </div>
   )

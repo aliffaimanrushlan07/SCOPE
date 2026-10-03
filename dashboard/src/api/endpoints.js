@@ -26,6 +26,14 @@ export const overview = ({ days = 30, granularity = 'day' } = {}) =>
     .get('/admin/analytics/overview', { params: { days, granularity } })
     .then((r) => r.data)
 
+/** Patrol timing. Omit latitude/longitude for all locations combined. */
+export const timing = ({ days = 30, latitude, longitude } = {}) =>
+  client
+    .get('/admin/analytics/timing', {
+      params: { days, lat: latitude ?? undefined, lng: longitude ?? undefined },
+    })
+    .then((r) => r.data)
+
 // --- D03 hotspot clusters --------------------------------------------------
 
 export const clusters = ({ days = 365, precision = 3 } = {}) =>
