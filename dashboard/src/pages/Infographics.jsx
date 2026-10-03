@@ -31,6 +31,18 @@ export default function Infographics() {
 
   useEffect(load, [load])
 
+  // Each slot publishes and deletes on its own. Only the slot that changed is
+  // replaced, from the server's response: reloading the whole list swapped the
+  // grid for a loading state, which unmounted the OTHER card and threw away an
+  // image and title chosen there but not yet published.
+  const handleSaved = useCallback((updated) => {
+    setSlots((current) =>
+      current.map((slot) =>
+        slot.infographic_id === updated.infographic_id ? updated : slot,
+      ),
+    )
+  }, [])
+
   return (
     <>
       <TopBar title="Infographics" />
@@ -55,7 +67,7 @@ export default function Infographics() {
             }}
           >
             {slots.map((slot) => (
-              <SlotCard key={slot.infographic_id} slot={slot} onSaved={load} />
+              <SlotCard key={slot.infographic_id} slot={slot} onSaved={handleSaved} />
             ))}
           </div>
         )}
@@ -94,11 +106,15 @@ function SlotCard({ slot, onSaved }) {
     setSaving(true)
     setError('')
     try {
-      await api.updateInfographic(slot.infographic_id, { title: title.trim(), image: file })
+      const updated = await api.updateInfographic(slot.infographic_id, {
+        title: title.trim(),
+        image: file,
+      })
       setFile(null)
       setPreview(null)
+      if (inputRef.current) inputRef.current.value = ''
       setSaved(true)
-      onSaved()
+      onSaved(updated)
     } catch (err) {
       setError(errorMessage(err, 'The slot could not be updated.'))
     } finally {
@@ -115,10 +131,10 @@ function SlotCard({ slot, onSaved }) {
     setDeleting(true)
     setError('')
     try {
-      await api.deleteInfographic(slot.infographic_id)
+      const updated = await api.deleteInfographic(slot.infographic_id)
       handleReset()
       setSaved(false)
-      onSaved()
+      onSaved(updated)
     } catch (err) {
       setError(errorMessage(err, 'The slot could not be deleted.'))
     } finally {
