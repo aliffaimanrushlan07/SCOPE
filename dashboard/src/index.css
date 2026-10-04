@@ -13,8 +13,9 @@
  * monotonically across that scale, which is what keeps the map readable for
  * colour-blind officers and survives black-and-white printing of the report.
  *
- * Brand teal appears only on primary buttons, focus rings and the active nav
- * item — never on a chart, never on the map.
+ * Brand teal appears only on primary buttons, focus rings, the active nav
+ * item and the hover edge of the Overview stat cards — never on a chart,
+ * never on the map.
  *
  * On the palette: chrome and brand are taken from the SCOPE mark, whose teals
  * run #0B2F2C through #2DD4BF. They were previously derived from the Jalur
@@ -155,6 +156,25 @@ input, select {
   box-shadow: var(--shadow);
 }
 
+/* Overview stat cards. A quiet teal edge on hover and nothing else: no
+   movement, so the number under the cursor stays put and stays selectable.
+   The tint is the brand at low alpha, kept on the card frame so the figures
+   themselves stay greyscale. */
+.stat-card {
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.stat-card:hover {
+  border-color: rgba(17, 94, 89, 0.45);
+  box-shadow: var(--shadow), 0 0 0 3px rgba(17, 94, 89, 0.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat-card {
+    transition: none;
+  }
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -193,6 +213,38 @@ input, select {
   color: var(--white);
 }
 
+/* D01 login card, a BorderGlow in place of .card. Sized here because the
+   component takes no style prop; z-index lifts it over the fixed wave
+   backdrop. */
+.border-glow-card.login-card {
+  z-index: 1;
+  width: 100%;
+  max-width: 400px;
+}
+
+/* D01 login submit. A SpecularButton dressed as .btn-primary: same brand
+   fill, white label (7.6:1, AAA), 8px corners and 14px type, so it reads as
+   the dashboard's primary action with only the rim highlight added. The
+   doubled class outranks the component's own stylesheet whatever order the
+   two load in, and the solid background also covers browsers without
+   color-mix(), where the component's tint would otherwise drop to
+   transparent and leave white text on the white card. */
+.specular-button.login-submit {
+  width: 100%;
+  padding: 12px 15px;
+  font-size: 14px;
+  font-weight: 550;
+  background: var(--brand);
+  box-shadow: var(--shadow);
+}
+.specular-button.login-submit:hover:not(:disabled) {
+  background: var(--brand-dark);
+}
+.specular-button.login-submit:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -217,7 +269,7 @@ input, select {
 .field input:focus,
 .field select:focus {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(26, 61, 143, 0.16);
+  box-shadow: 0 0 0 3px rgba(17, 94, 89, 0.16);
 }
 
 .muted {
