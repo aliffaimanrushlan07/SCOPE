@@ -152,7 +152,7 @@ export default function HotspotMap() {
         id: 'cluster-counts',
         data: clusters,
         getPosition: (c) => [c.longitude, c.latitude],
-        getFillColor: (c) => [...rgb(bandFor(c).fill), bandFor(c).alpha ?? 255],
+        getFillColor: (c) => [...rgb(bandFor(c).fill), (colorFilter === 'all' ? bandFor(c).allAlpha : bandFor(c).alpha) ?? 255],
         extensions: [new RadialFade()],
         getRadius: (c) => bandFor(c).size / 2,
         radiusUnits: 'pixels',
@@ -163,7 +163,7 @@ export default function HotspotMap() {
           setHover(info.object ? { x: info.x, y: info.y, count: info.object.count } : null),
       }),
     ],
-    [clusters],
+    [clusters, colorFilter],
   )
 
   return (
