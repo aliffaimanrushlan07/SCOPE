@@ -1,6 +1,13 @@
 /// Response models mirroring the backend's Pydantic schemas.
 library;
 
+/// Reads a JSON number that the backend may send as a string.
+///
+/// Pydantic serialises `Decimal` fields (coordinates, confidence scores) as
+/// strings, so a plain `as num` cast throws on them.
+double _asDouble(Object? v) =>
+    v is num ? v.toDouble() : double.parse(v as String);
+
 /// One photograph's verdict from S10.
 class PhotoVerdict {
   const PhotoVerdict({
@@ -179,8 +186,8 @@ class PlaceDetail {
   factory PlaceDetail.fromJson(Map<String, dynamic> json) => PlaceDetail(
         placeId: json['place_id'] as String,
         name: json['name'] as String,
-        latitude: (json['latitude'] as num).toDouble(),
-        longitude: (json['longitude'] as num).toDouble(),
+        latitude: _asDouble(json['latitude']),
+        longitude: _asDouble(json['longitude']),
         address: json['address'] as String?,
       );
 }
@@ -203,7 +210,7 @@ class ReportPhotoDetail {
       ReportPhotoDetail(
         sequenceNo: json['sequence_no'] as int,
         storagePath: json['storage_path'] as String,
-        confidenceScore: (json['confidence_score'] as num).toDouble(),
+        confidenceScore: _asDouble(json['confidence_score']),
         capturedAt: DateTime.parse(json['captured_at'] as String),
       );
 }
@@ -237,8 +244,8 @@ class ReportDetail {
         referenceNo: json['reference_no'] as String,
         reportedAt: DateTime.parse(json['reported_at'] as String),
         submittedAt: DateTime.parse(json['submitted_at'] as String),
-        latitude: (json['latitude'] as num).toDouble(),
-        longitude: (json['longitude'] as num).toDouble(),
+        latitude: _asDouble(json['latitude']),
+        longitude: _asDouble(json['longitude']),
         premiseName: json['premise_name'] as String?,
         addressText: json['address_text'] as String?,
         photos: (json['photos'] as List)
@@ -260,8 +267,8 @@ class HotspotPoint {
   final int weight;
 
   factory HotspotPoint.fromJson(Map<String, dynamic> json) => HotspotPoint(
-        latitude: (json['latitude'] as num).toDouble(),
-        longitude: (json['longitude'] as num).toDouble(),
+        latitude: _asDouble(json['latitude']),
+        longitude: _asDouble(json['longitude']),
         weight: json['weight'] as int,
       );
 }
