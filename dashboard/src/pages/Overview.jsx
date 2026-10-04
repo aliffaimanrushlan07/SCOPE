@@ -297,7 +297,7 @@ export default function Overview() {
 
 function StatCard({ label, value, delta, muted }) {
   return (
-    <div className="card" style={{ padding: 16 }}>
+    <div className="card stat-card" style={{ padding: 16 }}>
       <div className="muted" style={{ fontSize: 12.5 }}>
         {label}
       </div>
