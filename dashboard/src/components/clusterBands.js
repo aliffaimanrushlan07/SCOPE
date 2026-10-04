@@ -43,8 +43,8 @@ export const PIN_ICON_ANCHOR = { x: 13, y: 38 }
  * normal text on its own fill (9.9:1, 6.9:1, 5.1:1, 6.2:1).
  */
 export const CLUSTER_BANDS = [
-  { band: 1, label: '1 – 4', fill: '#FFE01B', ink: '#3D2F05', size: 26, alpha: 130 },
-  { band: 2, label: '5 – 9', fill: '#FF8A00', ink: '#331A00', size: 46 },
-  { band: 3, label: '10 – 19', fill: '#FF3B14', ink: '#2B0C02', size: 58 },
-  { band: 4, label: '20 +', fill: '#C1121F', ink: '#FFFFFF', size: 72 },
+  { band: 1, label: '1 – 4', fill: '#FFE01B', ink: '#3D2F05', size: 18, alpha: 130, allAlpha: 70 },
+  { band: 2, label: '5 – 9', fill: '#FF8A00', ink: '#331A00', size: 30, allAlpha: 110 },
+  { band: 3, label: '10 – 19', fill: '#FF3B14', ink: '#2B0C02', size: 38, allAlpha: 130 },
+  { band: 4, label: '20 +', fill: '#C1121F', ink: '#FFFFFF', size: 48 },
 ]
