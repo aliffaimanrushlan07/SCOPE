@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Map, useMap } from '@vis.gl/react-google-maps'
+import { AdvancedMarker, Map, useMap } from '@vis.gl/react-google-maps'
 import { GoogleMapsOverlay } from '@deck.gl/google-maps'
 import { LayerExtension } from '@deck.gl/core'
 import { HeatmapLayer } from '@deck.gl/aggregation-layers'
@@ -326,6 +326,7 @@ function SizedMap({ layers }) {
         >
           <DeckGLOverlay layers={layers} />
           <ZoomButtons />
+          <LocateButton />
         </Map>
       )}
     </div>
@@ -397,6 +398,100 @@ function ZoomButtons() {
       <div style={{ height: 1, background: 'var(--line)' }} />
       {btn('−', 'Zoom out', -1, zoom != null && zoom <= MIN_ZOOM)}
     </div>
+  )
+}
+
+/**
+ * "Show my location": asks the browser for the admin's position, pans the map
+ * there and drops a blue dot. Needs a secure context (https or localhost) and
+ * the admin's permission; a denial is reported inline rather than failing
+ * silently.
+ */
+function LocateButton() {
+  const map = useMap()
+  const [pos, setPos] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const locate = () => {
+    if (!navigator.geolocation) {
+      setMsg('Location is not supported by this browser.')
+      return
+    }
+    setBusy(true)
+    setMsg('')
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const p = { lat: coords.latitude, lng: coords.longitude }
+        setPos(p)
+        setBusy(false)
+        if (map) {
+          map.panTo(p)
+          map.setZoom(Math.max(map.getZoom() ?? 0, 15))
+        }
+      },
+      (err) => {
+        setBusy(false)
+        setMsg(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission was denied.'
+            : 'Your location could not be determined.',
+        )
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
+  return (
+    <>
+      {pos && (
+        <AdvancedMarker position={pos} title="Your location">
+          <div
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              background: '#1a73e8',
+              border: '3px solid #fff',
+              boxShadow: '0 0 0 6px rgba(26,115,232,0.25), 0 1px 4px rgba(0,0,0,0.4)',
+            }}
+          />
+        </AdvancedMarker>
+      )}
+      <div style={{ position: 'absolute', top: 100, right: 16, zIndex: 1000 }}>
+        <button
+          type="button"
+          className="card"
+          aria-label="Show my current location"
+          title="Show my current location"
+          onClick={locate}
+          disabled={busy}
+          style={{
+            width: 36,
+            height: 36,
+            padding: 0,
+            display: 'grid',
+            placeItems: 'center',
+            cursor: busy ? 'progress' : 'pointer',
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+          </svg>
+        </button>
+        {msg && (
+          <div
+            role="alert"
+            className="card"
+            style={{ position: 'absolute', right: 0, top: 42, width: 200, padding: '8px 10px', fontSize: 12.5 }}
+          >
+            {msg}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
