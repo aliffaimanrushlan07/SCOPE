@@ -33,18 +33,21 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: Gap.lg),
                     _FeatureButton(
                       icon: Icons.menu_book_outlined,
+                      image: 'assets/home/awareness.png',
                       label: 'Awareness Hub',
                       onTap: () => context.push(Routes.awarenessHub),
                     ),
                     const SizedBox(height: Gap.sm),
                     _FeatureButton(
                       icon: Icons.map_outlined,
+                      image: 'assets/home/hotspot.png',
                       label: 'View Smoking Violation Hotspot Map',
                       onTap: () => context.push(Routes.hotspotMap),
                     ),
                     const SizedBox(height: Gap.sm),
                     _FeatureButton(
                       icon: Icons.rule_outlined,
+                      image: 'assets/home/guidelines.png',
                       label: 'Reporting Guidelines',
                       onTap: () => context.push(Routes.guidelines),
                     ),
@@ -63,21 +66,93 @@ class HomeScreen extends StatelessWidget {
   Widget _buildPrimaryAction(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(Gap.md, Gap.sm, Gap.md, Gap.md),
-      child: SizedBox(
-        height: 64,
-        child: FilledButton.icon(
-          onPressed: () => context.push(Routes.capture),
-          icon: const Icon(Icons.photo_camera_rounded, size: 26),
-          label: const Text(
-            'MAKE A REPORT',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
+      child: _ShimmerSweep(
+        borderRadius: BorderRadius.circular(28),
+        child: SizedBox(
+          height: 64,
+          child: FilledButton.icon(
+            onPressed: () => context.push(Routes.capture),
+            icon: const Icon(Icons.photo_camera_rounded, size: 26),
+            label: const Text(
+              'MAKE A REPORT',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A light streak that sweeps across [child] every few seconds.
+///
+/// Drawn over the button and ignoring pointers, so taps still reach it. Loops
+/// forever, so it is switched off when the user has asked for less motion
+/// (WCAG 2.2.2), as the poster is.
+class _ShimmerSweep extends StatefulWidget {
+  const _ShimmerSweep({required this.child, required this.borderRadius});
+
+  final Widget child;
+  final BorderRadius borderRadius;
+
+  @override
+  State<_ShimmerSweep> createState() => _ShimmerSweepState();
+}
+
+class _ShimmerSweepState extends State<_ShimmerSweep>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2800),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return widget.child;
+
+    return Stack(
+      children: [
+        widget.child,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: ClipRRect(
+              borderRadius: widget.borderRadius,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  // The streak travels from just off the left edge to just off
+                  // the right in the first 60% of the cycle, then rests.
+                  final t = (_controller.value / 0.6).clamp(0.0, 1.0);
+                  final x = -1.5 + 3.0 * t;
+                  return DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment(x - 0.5, -0.3),
+                        end: Alignment(x + 0.5, 0.3),
+                        colors: [
+                          Colors.white.withValues(alpha: 0),
+                          Colors.white.withValues(alpha: 0.35),
+                          Colors.white.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -296,11 +371,16 @@ class _HomePoster extends StatelessWidget {
 class _FeatureButton extends StatelessWidget {
   const _FeatureButton({
     required this.icon,
+    required this.image,
     required this.label,
     required this.onTap,
   });
 
   final IconData icon;
+
+  /// Bundled illustration shown in the mini container. Falls back to [icon]
+  /// until the artwork is added.
+  final String image;
   final String label;
   final VoidCallback onTap;
 
@@ -308,9 +388,29 @@ class _FeatureButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton(
       onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: Gap.sm, vertical: Gap.sm),
+      ),
       child: Row(
         children: [
-          Icon(icon, size: 22, color: ScopeTheme.primary),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 56,
+              height: 56,
+              color: ScopeTheme.primary.withValues(alpha: 0.08),
+              padding: const EdgeInsets.all(4),
+              child: Image.asset(
+                image,
+                // The artwork is not square; show all of it rather than crop.
+                fit: BoxFit.contain,
+                cacheWidth: 200,
+                excludeFromSemantics: true,
+                errorBuilder: (_, _, _) =>
+                    Icon(icon, size: 26, color: ScopeTheme.primary),
+              ),
+            ),
+          ),
           const SizedBox(width: Gap.md),
           Expanded(child: Text(label, textAlign: TextAlign.left)),
           const Icon(Icons.chevron_right_rounded, color: ScopeTheme.inkMuted),
