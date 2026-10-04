@@ -43,6 +43,10 @@ class _CaptureScreenState extends State<CaptureScreen>
   CameraController? _controller;
   _CameraState _state = _CameraState.initialising;
   bool _isCapturing = false;
+
+  /// Guards against overlapping starts: the permission prompt and a shade
+  /// pull both produce inactive -> resumed while a start may be under way.
+  bool _isInitialising = false;
   String? _errorDetail;
 
   static const double _zoomCap = 8.0;
@@ -69,21 +73,36 @@ class _CaptureScreenState extends State<CaptureScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) return;
-
-    // The camera must be released when the app is backgrounded, or it will be
-    // unavailable on resume.
+    // The camera must be released when the app loses focus, or it will be
+    // unavailable on resume. `inactive` is also what pulling down the
+    // notification shade or taking a screenshot produces, with no `paused`
+    // in between, so resume must restart the camera from `_controller` being
+    // null — not bail out because there is no controller to inspect.
     if (state == AppLifecycleState.inactive) {
-      controller.dispose();
+      final controller = _controller;
+      if (controller == null) return;
       _controller = null;
+      // Take the preview out of the tree before the controller is disposed,
+      // so it never draws a dead texture (the blank viewfinder).
+      if (mounted) setState(() => _state = _CameraState.initialising);
+      controller.dispose();
     } else if (state == AppLifecycleState.resumed) {
-      _initialiseCamera();
+      if (_controller == null && !_isInitialising) _initialiseCamera();
     }
   }
 
   Future<void> _initialiseCamera() async {
-    setState(() => _state = _CameraState.initialising);
+    if (_isInitialising) return;
+    _isInitialising = true;
+    try {
+      await _startCamera();
+    } finally {
+      _isInitialising = false;
+    }
+  }
+
+  Future<void> _startCamera() async {
+    if (mounted) setState(() => _state = _CameraState.initialising);
 
     final status = await Permission.camera.request();
     if (!status.isGranted) {
@@ -122,7 +141,11 @@ class _CaptureScreenState extends State<CaptureScreen>
       final minZoom = await controller.getMinZoomLevel();
       final maxZoom = await controller.getMaxZoomLevel();
 
-      if (!mounted) {
+      // Lost focus again while starting (shade pulled mid-start): release it;
+      // the next resume starts it afresh.
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      if (!mounted ||
+          (lifecycle != null && lifecycle != AppLifecycleState.resumed)) {
         await controller.dispose();
         return;
       }
