@@ -5,7 +5,7 @@ import { errorMessage } from '../api/client'
 import {
   ErrorState,
   Loading,
-  Notice,
+  InfoPopover,
   TopBar,
   formatDateTime,
 } from '../components/ui'
@@ -72,20 +72,23 @@ export default function Reports() {
 
   return (
     <>
-      <TopBar title="Reports">
+      <TopBar
+        title="Reports"
+        info={
+          <InfoPopover>
+            Reports are read-only. Evidence is validated by the AI classifier
+            before submission, so every report listed here has already passed
+            validation. Administrators view and export report data; they do not
+            verify, approve or reject it.
+          </InfoPopover>
+        }
+      >
         <button className="btn" onClick={handleExport} disabled={exporting}>
           {exporting ? 'Preparing…' : '↓ Export CSV'}
         </button>
       </TopBar>
 
       <div className="page">
-        <Notice>
-          Reports are read-only. Evidence is validated by the AI classifier
-          before submission, so every report listed here has already passed
-          validation. Administrators view and export report data; they do not
-          verify, approve or reject it.
-        </Notice>
-
         <form className="card" onSubmit={applyFilters} style={{ padding: 16 }}>
           <div
             style={{

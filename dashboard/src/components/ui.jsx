@@ -1,9 +1,53 @@
+import { useEffect, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 
-export function TopBar({ title, children }) {
+/** An "i" button that opens a small pop-up label; closes on outside click or Esc. */
+export function InfoPopover({ title, children }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    const onKey = (e) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <span ref={ref} className="info">
+      <button
+        type="button"
+        className="info-btn"
+        aria-label="More information"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        i
+      </button>
+      {open && (
+        <div role="dialog" className="info-pop">
+          {title && <strong style={{ display: 'block', marginBottom: 2 }}>{title}</strong>}
+          {children}
+        </div>
+      )}
+    </span>
+  )
+}
+
+export function TopBar({ title, info, children }) {
   return (
     <header className="topbar">
-      <h1 style={{ fontSize: 19, flex: 1 }}>{title}</h1>
+      <h1 style={{ fontSize: 19, flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+        {title}
+        {info}
+      </h1>
       {children}
     </header>
   )
