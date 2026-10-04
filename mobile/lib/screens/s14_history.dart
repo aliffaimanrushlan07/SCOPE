@@ -209,7 +209,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: Gap.lg),
             FilledButton.icon(
-              onPressed: () => context.go(Routes.capture),
+              onPressed: () => context.push(Routes.capture),
               icon: const Icon(Icons.photo_camera_rounded, size: 20),
               label: const Text('Make a report'),
             ),

@@ -115,7 +115,12 @@ class SubmissionSuccessScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: Gap.sm),
                     OutlinedButton(
-                      onPressed: () => context.go(Routes.history),
+                      onPressed: () {
+                        // go() alone would leave History as the only page, with
+                        // no way back; put Home underneath it first.
+                        context.go(Routes.home);
+                        context.push(Routes.history);
+                      },
                       child: const Text('View report history'),
                     ),
                   ],
