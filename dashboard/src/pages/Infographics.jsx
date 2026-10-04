@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../api/endpoints'
 import { errorMessage, mediaUrl } from '../api/client'
-import { ErrorState, Loading, Notice, TopBar, formatDateTime } from '../components/ui'
+import { ErrorState, InfoPopover, Loading, TopBar, formatDateTime } from '../components/ui'
 
 /**
  * D06 — Infographic Management.
@@ -45,15 +45,18 @@ export default function Infographics() {
 
   return (
     <>
-      <TopBar title="Infographics" />
+      <TopBar
+        title="Infographics"
+        info={
+          <InfoPopover title="Two slots">
+            Published infographics appear in the mobile app's Awareness Hub. You
+            can replace the image, edit the title or delete each one. A deleted
+            slot stays here, empty, so you can publish a new infographic into it.
+          </InfoPopover>
+        }
+      />
 
       <div className="page">
-        <Notice title="Two slots">
-          Published infographics appear in the mobile app's Awareness Hub. You
-          can replace the image, edit the title or delete each one. A deleted
-          slot stays here, empty, so you can publish a new infographic into it.
-        </Notice>
-
         {loading ? (
           <Loading label="Loading slots…" />
         ) : error ? (
@@ -63,7 +66,7 @@ export default function Infographics() {
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
-              gap: 18,
+              gap: 12,
             }}
           >
             {slots.map((slot) => (

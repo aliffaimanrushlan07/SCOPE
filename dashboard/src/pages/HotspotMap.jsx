@@ -1,12 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Map, useMap } from '@vis.gl/react-google-maps'
 import { GoogleMapsOverlay } from '@deck.gl/google-maps'
+import { LayerExtension } from '@deck.gl/core'
 import { HeatmapLayer } from '@deck.gl/aggregation-layers'
-import { ScatterplotLayer, TextLayer } from '@deck.gl/layers'
+import { ScatterplotLayer } from '@deck.gl/layers'
 import * as api from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import { ErrorState, Loading, TopBar } from '../components/ui'
+import { ErrorState, InfoPopover, Loading, TopBar } from '../components/ui'
 import { CLUSTER_BANDS } from '../components/clusterBands'
+
+/**
+ * Fades each cluster circle radially: solid at the centre, easing to fully
+ * transparent at the rim. `geometry.uv` is the scatterplot's unit position, so
+ * its length is 0 at the centre and 1 at the edge. The solid core (first 25%)
+ * keeps the numeral readable.
+ */
+class RadialFade extends LayerExtension {
+  getShaders() {
+    return {
+      inject: {
+        'fs:DECKGL_FILTER_COLOR': `
+          float rFade = length(geometry.uv);
+          color.a *= 1.0 - smoothstep(0.25, 1.0, rFade);
+        `,
+      },
+    }
+  }
+}
 
 const KUALA_LUMPUR = { lat: 3.139, lng: 101.6869 }
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
@@ -41,6 +61,15 @@ const COLOR_RANGE = [[255, 247, 194], ...CLUSTER_BANDS.map((b) => rgb(b.fill))]
 const bandFor = (cluster) =>
   CLUSTER_BANDS[(cluster.band ?? 1) - 1] ?? CLUSTER_BANDS[0]
 
+/** Colour filter: one option per colour band, plus All. */
+const COLOR_FILTERS = [
+  { key: 'all', label: 'All', bands: [1, 2, 3, 4], dot: null },
+  { key: 'yellow', label: 'Yellow', bands: [1], dot: CLUSTER_BANDS[0].fill },
+  { key: 'orange', label: 'Orange', bands: [2], dot: CLUSTER_BANDS[1].fill },
+  { key: 'red', label: 'Red (10–19)', bands: [3], dot: CLUSTER_BANDS[2].fill },
+  { key: 'darkred', label: 'Dark red (20+)', bands: [4], dot: CLUSTER_BANDS[3].fill },
+]
+
 /** Width of the legend's swatch column — the largest swatch, so all four fit. */
 const SWATCH_COLUMN = Math.max(...CLUSTER_BANDS.map((b) => b.size)) / 2.6
 
@@ -62,9 +91,11 @@ const SWATCH_COLUMN = Math.max(...CLUSTER_BANDS.map((b) => b.size)) / 2.6
  */
 export default function HotspotMap() {
   const [days, setDays] = useState(365)
-  const [clusters, setClusters] = useState([])
+  const [allClusters, setClusters] = useState([])
+  const [colorFilter, setColorFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [hover, setHover] = useState(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -78,6 +109,11 @@ export default function HotspotMap() {
 
   useEffect(load, [load])
 
+  const clusters = useMemo(() => {
+    const { bands } = COLOR_FILTERS.find((f) => f.key === colorFilter)
+    return allClusters.filter((c) => bands.includes(c.band ?? 1))
+  }, [allClusters, colorFilter])
+
   const total = clusters.reduce((sum, c) => sum + c.count, 0)
 
   /**
@@ -89,10 +125,10 @@ export default function HotspotMap() {
    * aggregation deck.gl rescales the colour domain by metres-per-pixel on every
    * zoom. The same orange therefore means different totals at different zooms.
    *
-   * The circles carry the counts. Each one is coloured, sized and labelled from
+   * The circles carry the counts. Each one is coloured, sized and from
    * the cluster's OWN count via the section 10.4 band, so colour there does map
    * to a stated range — which is what the legend documents. Counts belong on
-   * this layer and nowhere else.
+   * this layer and nowhere else, shown as a label on hover.
    *
    * Drawing order matters: the API returns clusters by count descending, so the
    * largest circles are drawn first and smaller ones land on top of them rather
@@ -116,28 +152,15 @@ export default function HotspotMap() {
         id: 'cluster-counts',
         data: clusters,
         getPosition: (c) => [c.longitude, c.latitude],
-        getFillColor: (c) => rgb(bandFor(c).fill),
-        getLineColor: [255, 255, 255],
+        getFillColor: (c) => [...rgb(bandFor(c).fill), bandFor(c).alpha ?? 255],
+        extensions: [new RadialFade()],
         getRadius: (c) => bandFor(c).size / 2,
         radiusUnits: 'pixels',
-        stroked: true,
-        lineWidthUnits: 'pixels',
-        getLineWidth: 1.5,
+        stroked: false,
         opacity: 0.95,
-        pickable: false,
-      }),
-      new TextLayer({
-        id: 'cluster-numerals',
-        data: clusters,
-        getPosition: (c) => [c.longitude, c.latitude],
-        getText: (c) => String(c.count),
-        getColor: (c) => rgb(bandFor(c).ink),
-        getSize: (c) => (bandFor(c).size >= 58 ? 16 : 13),
-        sizeUnits: 'pixels',
-        fontWeight: 700,
-        getTextAnchor: 'middle',
-        getAlignmentBaseline: 'center',
-        pickable: false,
+        pickable: true,
+        onHover: (info) =>
+          setHover(info.object ? { x: info.x, y: info.y, count: info.object.count } : null),
       }),
     ],
     [clusters],
@@ -145,26 +168,99 @@ export default function HotspotMap() {
 
   return (
     <>
-      <TopBar title="Hotspot Map">
+      <TopBar
+        title="Hotspot Map"
+        info={
+          <InfoPopover>
+            Shows where reports concentrate. Each circle is a cluster of nearby
+            reports: its colour and size show how many (yellow 1–4, orange 5–9,
+            red 10–19, dark red 20+), and hovering it shows the exact count. The
+            glow behind is a relative density view. Use the colour buttons to
+            filter clusters, the +/− buttons to zoom, and the period selector to
+            change the date range.
+          </InfoPopover>
+        }
+      >
         <PeriodSelect value={days} onChange={setDays} />
       </TopBar>
 
-      <div className="page">
+      <div className="page" style={{ padding: 12, gap: 10 }}>
         {loading ? (
           <Loading label="Loading hotspots…" />
         ) : error ? (
           <ErrorState message={error} onRetry={load} />
         ) : (
           <>
-            <div className="card" style={{ padding: 14, display: 'flex', gap: 26 }}>
+            <div className="card" style={{ padding: '8px 14px', display: 'flex', gap: 26, alignItems: 'center' }}>
               <Stat label="Clusters" value={clusters.length} />
               <Stat label="Reports plotted" value={total} />
+              <div
+                role="group"
+                aria-label="Filter clusters by colour"
+                style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}
+              >
+                {COLOR_FILTERS.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    aria-pressed={colorFilter === f.key}
+                    onClick={() => {
+                      setHover(null)
+                      setColorFilter(f.key)
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 12px',
+                      borderRadius: 999,
+                      border: '1px solid var(--line)',
+                      background: colorFilter === f.key ? '#16191b' : 'transparent',
+                      color: colorFilter === f.key ? '#fff' : 'inherit',
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {f.dot && (
+                      <span
+                        aria-hidden="true"
+                        style={{ width: 10, height: 10, borderRadius: '50%', background: f.dot }}
+                      />
+                    )}
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
               <SizedMap layers={layers} />
 
               <Legend />
+
+              {hover && (
+                <div
+                  role="tooltip"
+                  style={{
+                    position: 'absolute',
+                    left: hover.x,
+                    top: hover.y,
+                    transform: 'translate(-50%, calc(-100% - 14px))',
+                    zIndex: 1000,
+                    pointerEvents: 'none',
+                    padding: '5px 10px',
+                    borderRadius: 6,
+                    background: '#16191b',
+                    color: '#fff',
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {hover.count} {hover.count === 1 ? 'report' : 'reports'}
+                </div>
+              )}
 
               {clusters.length === 0 && (
                 <div
@@ -215,7 +311,7 @@ function SizedMap({ layers }) {
   }, [])
 
   return (
-    <div ref={ref} style={{ height: 560, width: '100%' }}>
+    <div ref={ref} style={{ height: 'max(360px, calc(100vh - 175px))', width: '100%' }}>
       {sized && (
         <Map
           mapId={MAP_ID}
@@ -223,12 +319,83 @@ function SizedMap({ layers }) {
           defaultZoom={12}
           gestureHandling="greedy"
           disableDefaultUI
-          zoomControl
+          zoomControl={false}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
           style={{ height: '100%', width: '100%' }}
         >
           <DeckGLOverlay layers={layers} />
+          <ZoomButtons />
         </Map>
       )}
+    </div>
+  )
+}
+
+/**
+ * Custom +/- zoom buttons, replacing Google's default control so they match the
+ * dashboard. One click is one zoom level (a doubling or halving of scale): fine
+ * enough to keep your bearings, coarse enough to get from city to street in a
+ * few clicks. The 10–19 range keeps the view between city-wide and street level.
+ */
+const MIN_ZOOM = 10
+const MAX_ZOOM = 19
+
+function ZoomButtons() {
+  const map = useMap()
+  const [zoom, setZoom] = useState(null)
+
+  useEffect(() => {
+    if (!map) return undefined
+    setZoom(map.getZoom() ?? null)
+    const l = map.addListener('zoom_changed', () => setZoom(map.getZoom() ?? null))
+    return () => l.remove()
+  }, [map])
+
+  const step = (delta) => {
+    if (!map || zoom == null) return
+    map.setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(zoom) + delta)))
+  }
+
+  const btn = (label, aria, delta, disabled) => (
+    <button
+      type="button"
+      aria-label={aria}
+      disabled={disabled}
+      onClick={() => step(delta)}
+      style={{
+        width: 36,
+        height: 36,
+        fontSize: 20,
+        fontWeight: 600,
+        lineHeight: 1,
+        border: 'none',
+        background: 'transparent',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.35 : 1,
+      }}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <div
+      className="card"
+      style={{
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: 0,
+        overflow: 'hidden',
+      }}
+    >
+      {btn('+', 'Zoom in', 1, zoom != null && zoom >= MAX_ZOOM)}
+      <div style={{ height: 1, background: 'var(--line)' }} />
+      {btn('−', 'Zoom out', -1, zoom != null && zoom <= MIN_ZOOM)}
     </div>
   )
 }
@@ -327,9 +494,8 @@ function Legend() {
                   width: b.size / 2.6,
                   height: b.size / 2.6,
                   borderRadius: '50%',
-                  background: b.fill,
-                  border: '1.5px solid var(--white)',
-                  boxShadow: '0 0 0 1px var(--line)',
+                  background: `radial-gradient(circle, ${b.fill} 25%, transparent 100%)`,
+                  opacity: (b.alpha ?? 255) / 255,
                 }}
               />
             </span>
@@ -345,7 +511,7 @@ function Legend() {
         style={{ marginTop: 10, paddingTop: 9, borderTop: '1px solid var(--line)', lineHeight: 1.4 }}
       >
         The glow behind the circles shows where reports concentrate. Its shade is
-        relative to the current view, so read counts from the circles.
+        relative to the current view, so hover a circle to read its count.
       </div>
     </div>
   )

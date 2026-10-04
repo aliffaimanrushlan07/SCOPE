@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import * as api from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import { ErrorState, Loading, TopBar } from '../components/ui'
+import { ErrorState, InfoPopover, Loading, TopBar } from '../components/ui'
 import PatrolTiming from '../components/PatrolTiming'
 import { PeriodSelect } from './HotspotMap'
 
@@ -98,7 +98,17 @@ export default function Overview() {
 
   return (
     <>
-      <TopBar title="Overview">
+      <TopBar
+        title="Overview"
+        info={
+          <InfoPopover>
+            A summary of smoking-violation reports for the selected period:
+            totals compared with the previous period, how reports trend over
+            time, and when patrols are most needed. Use the period and interval
+            selectors to change the range and grouping. This page is read-only.
+          </InfoPopover>
+        }
+      >
         <select
           value={granularity}
           onChange={(e) => setGranularity(e.target.value)}
@@ -130,7 +140,7 @@ export default function Overview() {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                gap: 16,
+                gap: 10,
               }}
             >
               <StatCard label="Total reports (all time)" value={data.total_reports} />
