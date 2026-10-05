@@ -66,6 +66,10 @@
 			<string>UIInterfaceOrientationLandscapeLeft</string>
 			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
+		<!-- Google Maps key, injected from the git-ignored ios/Flutter/Secrets.xcconfig
+	     and read in AppDelegate.swift. Mirrors MAPS_API_KEY in android/local.properties. -->
+		<key>MAPS_API_KEY</key>
+		<string>$(MAPS_API_KEY)</string>
 		<!-- Usage descriptions. iOS TERMINATES the process if a permission is
 	     requested without one — it does not merely deny the permission, which
 	     is what Android does. These strings appear verbatim in the system
