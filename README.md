@@ -35,8 +35,8 @@ Per Table 3.5 of the final report.
 | Backend | Python 3.11 + FastAPI |
 | Database | PostgreSQL 15 + PostGIS 3.4 |
 | AI / ML | TensorFlow + Keras · fine-tuned Vision Transformer, served server-side |
-| Dashboard | React.js + Leaflet.js |
-| Mapping | Google Maps (mobile) · Leaflet/OSM (dashboard) |
+| Dashboard | React.js |
+| Mapping | Google Maps (mobile) · Google Maps (dashboard) |
 
 ---
 
